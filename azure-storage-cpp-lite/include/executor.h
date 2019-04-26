@@ -17,7 +17,6 @@
 #include "utility.h"
 
 #define HTTP_CODE_SERVICE_UNAVAILABLE 503 //Service unavailable
-#define SHORT_RETRY 5 //Retries for at least 30 seconds
 
 namespace microsoft_azure {
     namespace storage {
@@ -88,15 +87,9 @@ namespace microsoft_azure {
                             auto error = context->xml_parser()->parse_storage_error(str);
                             //to ensure the most helpful error code is returned, if the curl code returns ok
                             //return the http error code
+                            syslog(1, "HTTP code: %d", result);
+                            syslog(1, "CURL code: %d", code);
                             error.code = std::to_string(code == CURLE_OK ? result : code);
-                            if(code != CURLE_OK)
-                            {
-                                //updating retry limit to shorten it for this error 
-                                //we shorten the amount of retries because if this error comes up it is mainly due
-                                //to one of the parameters(namely the incorrect storage account name) being incorrect
-                                //in which retrying the maximum amount of times will not help solve the issue
-                                retry->set_retry_limit(SHORT_RETRY);
-                            }
                             *outcome = storage_outcome<RESPONSE_TYPE>(error);
                             //*outcome = storage_outcome<RESPONSE_TYPE>(context->xml_parser()->parse_storage_error(str));
                             retry->add_result(code == CURLE_OK ? result: HTTP_CODE_SERVICE_UNAVAILABLE);
@@ -121,9 +114,9 @@ namespace microsoft_azure {
                 std::shared_ptr<storage_account> account,
                 std::shared_ptr<storage_request_base> request,
                 std::shared_ptr<http_base> http,
-                std::shared_ptr<executor_context> context)
+                std::shared_ptr<executor_context> context,
+                std::shared_ptr<retry_context> retry)
             {
-                auto retry = std::make_shared<retry_context>();
                 auto outcome = std::make_shared<storage_outcome<RESPONSE_TYPE>>();
                 auto promise = std::make_shared<std::promise<storage_outcome<RESPONSE_TYPE>>>();
                 async_executor<RESPONSE_TYPE>::submit_helper(promise, outcome, account, request, http, context, retry);
@@ -181,14 +174,6 @@ namespace microsoft_azure {
                             //to ensure the most helpful error code is returned, if the curl code returns ok
                             //return the http error code
                             error.code = std::to_string(code == CURLE_OK ? result : code);
-                            if(code != CURLE_OK)
-                            {
-                                //updating retry limit to shorten it for this error 
-                                //we shorten the amount of retries because if this error comes up it is mainly due
-                                //to one of the parameters(namely the incorrect storage account name) being incorrect
-                                //in which retrying the maximum amount of times will not help solve the issue
-                                retry->set_retry_limit(SHORT_RETRY);
-                            }
                             *outcome = storage_outcome<void>(error);
                             //*outcome = storage_outcome<void>(context->xml_parser()->parse_storage_error(str));
                             retry->add_result(code == CURLE_OK ? result: HTTP_CODE_SERVICE_UNAVAILABLE);

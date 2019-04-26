@@ -527,37 +527,22 @@ TEST_F(BlobClientWrapperTest, ListBlobsHierarchial)
 /*
 The purpose of the IncorrectAccountName test is to ensure that blobfuse
 returns a more useful error code when the account name comes back incorrect.
-It is also to ensure that we don't retry the maximum amount and retries only up
+It is allo to ensure that we don't retry the maximum amount and retries only up
 to 6 times or less than 30 seconds
 */
 TEST_F(BlobClientWrapperTest, IncorrectAccountName)
 {
-    const int defaultMaxConcurrency = 20;
     std::string badAccountName = "badaccountnameasdf";
     //test for invalid storage connection
     clock_t start_time = clock();
     errno = 0;
-
-    blob_client_wrapper temp_azure_blob_client_wrapper = blob_client_wrapper::blob_client_wrapper_init(badAccountName, str_options.accountKey, str_options.sasToken, defaultMaxConcurrency, str_options.use_https, str_options.blobEndpoint);
-    ASSERT_EQ(0, errno) << "Failed to initialize blob client";
-    list_blobs_hierarchical_response response = temp_azure_blob_client_wrapper.list_blobs_hierarchical(str_options.containerName, "/", std::string(), std::string(), 1);
+    std::string goodAccountName = str_options.accountName;
+    str_options.accountName = badAccountName;
+    validate_storage_connection();
     ASSERT_NE(0,errno) << "Expected an error but received success after trying to connect with an invalid storage account name";
-    int duration = (start_time - clock()) / CLOCKS_PER_SEC;
+    clock_t end_time = clock();
+    double duration = double(end_time - start_time) / CLOCKS_PER_SEC;
+    std::cerr << "[           ] time elapsed: duration: "<< duration << std::endl;
     EXPECT_LE(duration, SHORT_RETRY_CHECK) << "Excessive amount of retries when received an error for checking storage connection";
-    
-    //test for invalid account name and put blob
-    start_time = clock();
-    
-    std::string file_path = tmp_dir + "/tmpfile";
-    std::string file_text = "some file text here.";
-
-    write_to_file(file_path, file_text);
-    std::string blob_1_name("blob1name");
-    errno = 0;
-    temp_azure_blob_client_wrapper.put_blob(file_path, container_name, blob_1_name);
-    ASSERT_NE(0, errno) << "Expected an error but recieved success after attempting put_blob with an invalid storage account name";
-
-    duration = (start_time - clock()) / CLOCKS_PER_SEC;
-    EXPECT_LT(duration, SHORT_RETRY_CHECK)<< "Excessive amount of retries when received an error for attempting to put_blob";
-
+    str_options.accountName = goodAccountName;
 }

@@ -12,6 +12,8 @@
 #include "blob/blob_client.h"
 #include "storage_errno.h"
 
+#define MAX_RETRY 26
+
 namespace microsoft_azure {
     namespace storage {
         const unsigned long long DOWNLOAD_CHUNK_SIZE = 16 * 1024 * 1024;
@@ -108,12 +110,18 @@ namespace microsoft_azure {
 
         blob_client_wrapper blob_client_wrapper::blob_client_wrapper_init(const std::string &account_name, const std::string &account_key, const std::string &sas_token, const unsigned int concurrency)
         {
-            return blob_client_wrapper_init(account_name, account_key, sas_token, concurrency, false, NULL);
+            return blob_client_wrapper_init(account_name, account_key, sas_token, concurrency, false, NULL, MAX_RETRY);
         }
 
 
         blob_client_wrapper blob_client_wrapper::blob_client_wrapper_init(const std::string &account_name, const std::string &account_key, const std::string &sas_token,  const unsigned int concurrency, const bool use_https, 
                                                                           const std::string &blob_endpoint)
+        {
+            return blob_client_wrapper_init(account_name, account_key, sas_token, concurrency, use_https, blob_endpoint, MAX_RETRY);
+        }
+
+        blob_client_wrapper blob_client_wrapper::blob_client_wrapper_init(const std::string &account_name, const std::string &account_key, const std::string &sas_token,  const unsigned int concurrency, const bool use_https, 
+                                                                          const std::string &blob_endpoint, const int retry_limit)
         {
             if(account_name.empty() || ((account_key.empty() && sas_token.empty()) || (!account_key.empty() && !sas_token.empty())))
             {
@@ -142,8 +150,9 @@ namespace microsoft_azure {
                     // We have already verified that exactly one form of credentials is present, so if shared key is not present, it must be sas.
                     cred = std::make_shared<shared_access_signature_credential>(sas_token);
                 }
+                std::shared_ptr<retry_context> r_context = std::make_shared<retry_context>(retry_limit);
                 std::shared_ptr<storage_account> account = std::make_shared<storage_account>(accountName, cred, use_https, blob_endpoint);
-                std::shared_ptr<blob_client> blobClient= std::make_shared<microsoft_azure::storage::blob_client>(account, concurrency_limit);
+                std::shared_ptr<blob_client> blobClient= std::make_shared<microsoft_azure::storage::blob_client>(account, r_context, concurrency_limit);
                 errno = 0;
                 return blob_client_wrapper(blobClient);
             }
@@ -154,7 +163,6 @@ namespace microsoft_azure {
                 return blob_client_wrapper(false);
             }
         }
-
         void blob_client_wrapper::create_container(const std::string &container)
         {
             if(!is_valid())

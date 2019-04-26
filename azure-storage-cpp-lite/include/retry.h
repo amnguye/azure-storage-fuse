@@ -40,8 +40,15 @@ namespace microsoft_azure {
                 m_retry_count(0),
                 m_result(0) {}
 
+            retry_context(int limit)
+            : m_retry_limit(limit),
+            m_retry_count(0),
+            m_result(0)
+            {}
+
             retry_context(int new_limit, http_base::http_code result)
                 : m_retry_limit(new_limit),
+                m_retry_count(0),
                 m_result(result) {}
 
             int limit() const {

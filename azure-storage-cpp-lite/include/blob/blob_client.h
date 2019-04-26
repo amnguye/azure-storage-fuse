@@ -32,7 +32,20 @@ namespace microsoft_azure { namespace storage {
         /// <param name="size">An int value indicates the maximum concurrency expected during execute requests against the service.</param>
         blob_client(std::shared_ptr<storage_account> account, int size)
             : m_account(account) {
-            m_context = std::make_shared<executor_context>(std::make_shared<tinyxml2_parser>(), std::make_shared<retry_policy>());
+            m_retry_context = std::make_shared<retry_context>();
+            m_context = std::make_shared<executor_context>(std::make_shared<tinyxml2_parser>(),std::make_shared<retry_policy>());
+            m_client = std::make_shared<CurlEasyClient>(size);
+        }
+        /// <summary>
+        /// Initializes a new instance of the <see cref="microsoft_azure::storage::blob_client" /> class.
+        /// </summary>
+        /// <param name="account">An existing <see cref="microsoft_azure::storage::storage_account" /> object.</param>
+        /// <param name="r_context">An existing retry context object</param>
+        /// <param name="size">An int value indicates the maximum concurrency expected during execute requests against the service.</param>
+        blob_client(std::shared_ptr<storage_account> account, std::shared_ptr<retry_context> r_context, int size)
+        : m_account(account), m_retry_context(r_context)
+        {
+            m_context = std::make_shared<executor_context>(std::make_shared<tinyxml2_parser>(),std::make_shared<retry_policy>());
             m_client = std::make_shared<CurlEasyClient>(size);
         }
 
@@ -253,6 +266,7 @@ namespace microsoft_azure { namespace storage {
         std::shared_ptr<CurlEasyClient> m_client;
         std::shared_ptr<storage_account> m_account;
         std::shared_ptr<executor_context> m_context;
+        std::shared_ptr<retry_context> m_retry_context;
     };
 
     /// <summary>
@@ -331,6 +345,21 @@ namespace microsoft_azure { namespace storage {
         /// <returns>Return a <see cref="microsoft_azure::storage::blob_client_wrapper"> object.</returns>
         static blob_client_wrapper blob_client_wrapper_init(const std::string &account_name, const std::string &account_key, const std::string &sas_token, const unsigned int concurrency, bool use_https, 
 							    const std::string &blob_endpoint);
+
+        /// <summary>
+        /// Constructs a blob client wrapper from storage account credential and retry limit.
+        /// </summary>
+        /// <param name="account_name">The storage account name.</param>
+        /// <param name="account_key">The storage account key.</param>
+	/// <param name="sas_token">A sas token for the container.</param>
+        /// <param name="concurrency">The maximum number requests could be executed in the same time.</param>
+        /// <param name="use_https">True if https should be used (instead of HTTP).  Note that this may cause a sizable perf loss, due to issues in libcurl.</param>
+        /// <param name="blob_endpoint">Blob endpoint URI to allow non-public clouds as well as custom domains.</param>
+        /// <param name="retry_limit">The maximum number of retries allowed when this blob client object is used</param>
+        /// <returns>Return a <see cref="microsoft_azure::storage::blob_client_wrapper"> object.</returns>
+        static blob_client_wrapper blob_client_wrapper_init(const std::string &account_name, const std::string &account_key, const std::string &sas_token, const unsigned int concurrency, bool use_https, 
+							    const std::string &blob_endpoint, const int retry_limit);
+
         /* C++ wrappers without exception but error codes instead */
 
         /* container level*/

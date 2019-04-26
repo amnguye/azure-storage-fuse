@@ -1,6 +1,8 @@
 #include "blobfuse.h"
 #include <string>
 
+#define SHORT_RETRY 5
+
 namespace {
     std::string trim(const std::string& str) {
         const size_t start = str.find_first_not_of(' ');
@@ -442,7 +444,7 @@ int validate_storage_connection()
     {
         const int defaultMaxConcurrency = 20;
         blob_client_wrapper temp_azure_blob_client_wrapper = blob_client_wrapper::blob_client_wrapper_init(str_options.accountName, str_options.accountKey, str_options.sasToken, defaultMaxConcurrency, str_options.use_https, 
-													   str_options.blobEndpoint);
+													   str_options.blobEndpoint, SHORT_RETRY);
         if(errno != 0)
         {
             syslog(LOG_CRIT, "Unable to start blobfuse.  Creating local blob client failed: errno = %d.\n", errno);

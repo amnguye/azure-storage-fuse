@@ -188,7 +188,7 @@ std::future<storage_outcome<list_containers_response>> blob_client::list_contain
     auto request = std::make_shared<list_containers_request>(prefix, include_metadata);
     request->set_maxresults(2);
 
-    return async_executor<list_containers_response>::submit(m_account, request, http, m_context);
+    return async_executor<list_containers_response>::submit(m_account, request, http, m_context, m_retry_context);
 }
 
 std::future<storage_outcome<list_blobs_response>> blob_client::list_blobs(const std::string &container, const std::string &prefix) {
@@ -197,7 +197,7 @@ std::future<storage_outcome<list_blobs_response>> blob_client::list_blobs(const 
     auto request = std::make_shared<list_blobs_request>(container, prefix);
     request->set_maxresults(2);
 
-    return async_executor<list_blobs_response>::submit(m_account, request, http, m_context);
+    return async_executor<list_blobs_response>::submit(m_account, request, http, m_context, m_retry_context);
 }
 
 std::future<storage_outcome<list_blobs_hierarchical_response>> blob_client::list_blobs_hierarchical(const std::string &container, const std::string &delimiter, const std::string &continuation_token, const std::string &prefix, int max_results) {
@@ -207,7 +207,7 @@ std::future<storage_outcome<list_blobs_hierarchical_response>> blob_client::list
     request->set_maxresults(max_results);
     request->set_includes(list_blobs_request_base::include::metadata);
 
-    return async_executor<list_blobs_hierarchical_response>::submit(m_account, request, http, m_context);
+    return async_executor<list_blobs_hierarchical_response>::submit(m_account, request, http, m_context, m_retry_context);
 }
 
 std::future<storage_outcome<get_block_list_response>> blob_client::get_block_list(const std::string &container, const std::string &blob) {
@@ -215,7 +215,7 @@ std::future<storage_outcome<get_block_list_response>> blob_client::get_block_lis
 
     auto request = std::make_shared<get_block_list_request>(container, blob);
 
-    return async_executor<get_block_list_response>::submit(m_account, request, http, m_context);
+    return async_executor<get_block_list_response>::submit(m_account, request, http, m_context, m_retry_context);
 }
 
 storage_outcome<blob_property> blob_client::get_blob_property(const std::string &container, const std::string &blob) {
@@ -377,7 +377,7 @@ std::future<storage_outcome<get_page_ranges_response>> blob_client::get_page_ran
         request->set_start_byte(offset);
     }
 
-    return async_executor<get_page_ranges_response>::submit(m_account, request, http, m_context);
+    return async_executor<get_page_ranges_response>::submit(m_account, request, http, m_context, m_retry_context);
 }
 
 std::future<storage_outcome<void>> blob_client::start_copy(const std::string &sourceContainer, const std::string &sourceBlob, const std::string &destContainer, const std::string &destBlob)

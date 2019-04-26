@@ -363,6 +363,9 @@ int azs_removexattr(const char *path, const char *name);
 /** Internal method, used to rename a single file in a (hopefully) lock-safe manner. */
 int azs_rename_single_file(const char *src, const char *dst);
 
+/** Validate Storage Account connection */
+int validate_storage_connection();
+
 /**
 * Convert a value into a string.
 */

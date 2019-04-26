@@ -218,7 +218,6 @@ void read_file_data_and_validate(std::string path, unsigned int seed, size_t cou
 // Helper method to validate uploading and download a single file of arbitrary size
 void BlobClientWrapperTest::run_upload_download(size_t file_size)
 {
-    std::cerr << "[      ] running this run upload download" <<  std::endl;
     errno = 0;
     std::vector<list_blobs_hierarchical_item> blobs = list_all_blobs(container_name, "/", "");
     ASSERT_EQ(0, errno);
@@ -538,11 +537,11 @@ TEST_F(BlobClientWrapperTest, IncorrectAccountName)
     errno = 0;
     std::string goodAccountName = str_options.accountName;
     str_options.accountName = badAccountName;
+
     validate_storage_connection();
     ASSERT_NE(0,errno) << "Expected an error but received success after trying to connect with an invalid storage account name";
     clock_t end_time = clock();
     double duration = double(end_time - start_time) / CLOCKS_PER_SEC;
-    std::cerr << "[           ] time elapsed: duration: "<< duration << std::endl;
     EXPECT_LE(duration, SHORT_RETRY_CHECK) << "Excessive amount of retries when received an error for checking storage connection";
     str_options.accountName = goodAccountName;
 }

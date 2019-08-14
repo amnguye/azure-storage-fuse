@@ -1,4 +1,5 @@
 cmake_minimum_required(VERSION 2.8)
+set(CMAKE_MODULE_PATH $(CMAKE_MODULE_PATH) "${CMAKE_SOURCE_DIR}/CMake")
 set(AZURE_STORAGE_HEADER
   azure-storage-cpp-lite/include/storage_EXPORTS.h
 
@@ -124,18 +125,19 @@ if(UNIX)
   find_package(Threads REQUIRED)
   find_package(CURL REQUIRED)
   find_package(GnuTLS REQUIRED)
+  find_package(FUSE REQUIRED)
   set(CMAKE_CXX_STANDARD 14)
   add_definitions(-D_FILE_OFFSET_BITS=64)
   set(WARNING "-Wall -Wextra -Werror -pedantic -pedantic-errors")
   set(CMAKE_CXX_FLAGS "${CMAKE_THREAD_LIBS_INIT} ${WARNING} ${CMAKE_CXX_FLAGS}")
-  include_directories(${CMAKE_SOURCE_DIR}/blobfuse ${CMAKE_SOURCE_DIR}/azure-storage-cpp-lite/include ${CURL_INCLUDE_DIRS} ${GNUTLS_INCLUDE_DIR})
+  include_directories(${CMAKE_SOURCE_DIR}/blobfuse ${CMAKE_SOURCE_DIR}/azure-storage-cpp-lite/include ${CURL_INCLUDE_DIRS} ${FUSE_INCLUDE_DIR} ${GNUTLS_INCLUDE_DIR})
 
   set(CMAKE_MACOSX_RPATH ON)
 
   add_executable(blobfuse ${BLOBFUSE_HEADER} ${BLOBFUSE_SOURCE} ${AZURE_STORAGE_HEADER} ${AZURE_STORAGE_SOURCE} blobfuse/main.cpp)
 
   pkg_search_module(UUID REQUIRED uuid)
-  target_link_libraries(blobfuse ${CURL_LIBRARIES} ${GNUTLS_LIBRARIES} ${CMAKE_THREAD_LIBS_INIT} ${UUID_LIBRARIES} fuse gcrypt)
+  target_link_libraries(blobfuse ${CURL_LIBRARIES} ${GNUTLS_LIBRARIES} ${FUSE_LIBRARIES} ${CMAKE_THREAD_LIBS_INIT} ${UUID_LIBRARIES} fuse gcrypt)
   install(TARGETS blobfuse
     PERMISSIONS OWNER_EXECUTE OWNER_WRITE OWNER_READ GROUP_READ GROUP_EXECUTE WORLD_READ WORLD_EXECUTE
     DESTINATION bin)
@@ -156,6 +158,7 @@ if(UNIX)
 
   set(CPACK_GENERATOR "DEB")
   set(CPACK_DEBIAN_PACKAGE_MAINTAINER "Microsoft - Azure Storage")
+  set(CPACK_DEBIAN_PACKAGE_DEPENDS "libfuse2, fuse, libstdc++6, libcurl, libgcrypt, libgnutls")
   set(CPACK_DEBIAN_PACKAGE_DESCRIPTION "blobfuse 1.1.0 - FUSE adapter for Azure Blob Storage")
   include(CPack)
 endif(UNIX)
@@ -204,6 +207,6 @@ if(INCLUDE_TESTS)
   set(CMAKE_CXX_STANDARD 14)
   pkg_search_module(UUID REQUIRED uuid)
   add_executable(blobfusetests ${BLOBFUSE_HEADER} ${BLOBFUSE_SOURCE} ${AZURE_STORAGE_HEADER} ${AZURE_STORAGE_SOURCE} blobfuse/blobfuse.cpp test/cpplitetests.cpp test/attribcachetests.cpp test/attribcachesynchronizationtests.cpp)
-  target_link_libraries(blobfusetests ${CURL_LIBRARIES} ${GNUTLS_LIBRARIES} ${CMAKE_THREAD_LIBS_INIT} ${UUID_LIBRARIES} fuse gcrypt gmock_main)
+  target_link_libraries(blobfusetests ${CURL_LIBRARIES} ${GNUTLS_LIBRARIES} ${CMAKE_THREAD_LIBS_INIT} ${UUID_LIBRARIES} ${FUSE_LIBRARIES} fuse gcrypt gmock_main)
 
 endif()

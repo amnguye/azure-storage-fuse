@@ -15,28 +15,30 @@ OauthTokenCredentialManager::OauthTokenCredentialManager(
     std::string resource_id_p)
 {
     // Create the URI token request
-    uri_token_request = constants::msi_request_uri;
+    uri_token_request_url.set_domain(constants::msi_request_uri);
     if(!client_id_p.empty())
     {
-        uri_token_request += constants::param_client_id + client_id_p;
+        uri_token_request_url.add_query(constants::param_client_id, client_id_p);
     }
     if(!object_id_p.empty())
     {
-        uri_token_request += constants::param_object_id + object_id_p;
+        uri_token_request_url.add_query(constants::param_object_id, object_id_p);
     }
     if(!resource_id_p.empty())
     {
-        uri_token_request += constants::param_mi_res_id + resource_id_p;
+        uri_token_request_url.add_query(constants::param_mi_res_id,resource_id_p);
     }
 
     // TODO: set constant for concurrency and figure out a better number for concurrency
-    httpClient = std::make_shared<CurlEasyClient>(20);
+    httpClient = std::make_shared<CurlEasyClient>(constants::max_concurrency_oauth);
     request_handle = httpClient->get_handle();
 
-    request_handle->set_url(uri_token_request);
+    request_handle->set_url(uri_token_request_url.to_string());
     request_handle->add_header(constants::header_metadata, constants::header_value_metadata);
 
-    printf("%s", uri_token_request.c_str());
+    printf("header metadata value: %s", request_handle->get_header(constants::header_metadata).c_str());
+
+    printf("uri_token_request_url: %s", uri_token_request_url.to_string().c_str());
 
     // Create the OAuth token
     current_oauth_token = refresh_token();
@@ -65,7 +67,7 @@ const std::string OauthTokenCredentialManager::refresh_token()
     if(token_mutex.try_lock())
     {
         //TODO: decide retry interval, also make constant
-        std::chrono::seconds retry_interval(5);
+        std::chrono::seconds retry_interval(constants::max_retry_oauth);
         std::string parsed_token;
         request_handle->submit([parsed_token](http_base::http_code http_code_result, storage_istream resultStream, CURLcode curl_code )
         {
@@ -89,7 +91,7 @@ const std::string OauthTokenCredentialManager::refresh_token()
     }
     else
     {
-        //TODO: check if the expirey token is still good and just return the current token to allow other threads
+        //TODO: check if the expiry token is still good and just return the current token to allow other threads
         // to keep chugging along while we try to refresh the token.
         token_mutex.lock();
     }

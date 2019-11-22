@@ -42,6 +42,7 @@ private:
     std::shared_ptr<CurlEasyRequest> request_handle;
     std::string uri_token_request;
     std::string current_oauth_token;
+    microsoft_azure::storage::storage_url uri_token_request_url;
     double expiry_time;
     bool valid_authentication;
     boost::shared_mutex token_mutex;

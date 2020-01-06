@@ -9,6 +9,9 @@
 #include "http_base.h"
 #include "utility.h"
 
+#pragma push_macro("min")
+#undef min
+
 namespace microsoft_azure {
     namespace storage {
 
@@ -87,3 +90,4 @@ namespace microsoft_azure {
 
     }
 }
+#pragma pop_macro("min")

@@ -7,9 +7,6 @@
 namespace microsoft_azure {
     namespace storage {
 
-
-
-
         CurlEasyRequest::CurlEasyRequest(std::shared_ptr<CurlEasyClient> client, CURL *h)
         : m_client(client),
             m_curl(h),
@@ -21,7 +18,8 @@ namespace microsoft_azure {
             check_code(curl_easy_setopt(m_curl, CURLOPT_HEADERDATA, this));
         }
 
-        CurlEasyRequest::~CurlEasyRequest() {
+        CurlEasyRequest::~CurlEasyRequest()
+        {
             curl_easy_reset(m_curl);
             m_client->release_handle(m_curl);
             if (m_slist) {
@@ -29,13 +27,16 @@ namespace microsoft_azure {
             }
         }
 
-        CURLcode CurlEasyRequest::perform() {
-            if (m_output_stream.valid()) {
+        CURLcode CurlEasyRequest::perform()
+        {
+            if (m_output_stream.valid())
+            {
                 check_code(curl_easy_setopt(m_curl, CURLOPT_WRITEFUNCTION, write));
                 check_code(curl_easy_setopt(m_curl, CURLOPT_WRITEDATA, this));
             }
             check_code(curl_easy_setopt(m_curl, CURLOPT_CUSTOMREQUEST, NULL));
-            switch (m_method) {
+            switch (m_method)
+            {
             case http_method::get:
                 check_code(curl_easy_setopt(m_curl, CURLOPT_HTTPGET, 1));
                 break;
@@ -52,6 +53,10 @@ namespace microsoft_azure {
             case http_method::post:
                 check_code(curl_easy_setopt(m_curl, CURLOPT_CUSTOMREQUEST, constants::http_post));
                 break;
+            case http_method::patch:
+                check_code(curl_easy_setopt(m_curl, CURLOPT_UPLOAD, 1));
+                check_code(curl_easy_setopt(m_curl, CURLOPT_CUSTOMREQUEST, constants::http_patch));
+                break;
             }
 
             check_code(curl_easy_setopt(m_curl, CURLOPT_URL, m_url.data()));
@@ -65,9 +70,18 @@ namespace microsoft_azure {
             return result;
         }
 
-        size_t CurlEasyRequest::header_callback(char *buffer, size_t size, size_t nitems, void *userdata) {
+        size_t CurlEasyRequest::header_callback(char *buffer, size_t size, size_t nitems, void *userdata)
+        {
             CurlEasyRequest::REQUEST_TYPE *p = static_cast<CurlEasyRequest::REQUEST_TYPE *>(userdata);
             std::string header(buffer, size * nitems);
+            if (!header.empty() && header.back() == '\n')
+            {
+                header.pop_back();
+            }
+            if (!header.empty() && header.back() == '\r')
+            {
+                header.pop_back();
+            }
             auto colon = header.find(':');
             if (colon == std::string::npos) {
                 auto space = header.find(' ');
@@ -81,7 +95,7 @@ namespace microsoft_azure {
                 }
             }
             else {
-                p->m_headers[header.substr(0, colon)] = header.substr(colon + 2);
+                p->m_response_headers[header.substr(0, colon)] = header.substr(colon + 2);
             }
             return size * nitems;
         }

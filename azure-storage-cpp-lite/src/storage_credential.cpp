@@ -38,10 +38,15 @@ namespace microsoft_azure {
             string_to_sign.append("\n"); // Range
 
             // Canonicalized headers
+        std::map<std::string, std::string> ordered_ms_headers;
             for (const auto &header : headers.ms_headers)
             {
-                string_to_sign.append(header.first).append(":").append(header.second).append("\n");
-            }
+            	ordered_ms_headers.emplace(to_lowercase(header.first), header.second);
+        	}
+        	for (const auto &header : ordered_ms_headers)
+        	{
+            	string_to_sign.append(header.first).append(":").append(header.second).append("\n");
+        	}
 
             // Canonicalized resource
             string_to_sign.append("/").append(m_account_name).append(url.get_encoded_path());

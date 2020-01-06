@@ -64,6 +64,9 @@ namespace microsoft_azure {
                 return m_error;
             }
 
+        void response() const
+        {
+        }
         private:
             bool m_success;
             storage_error m_error;

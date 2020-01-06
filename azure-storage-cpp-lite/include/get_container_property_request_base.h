@@ -23,6 +23,7 @@ namespace microsoft_azure {
         class container_property
         {
         public:
+        container_property() : m_valid(false) {}
             container_property(bool valid)
                 :m_valid(valid)
             {
@@ -42,7 +43,6 @@ namespace microsoft_azure {
             std::vector<std::pair<std::string, std::string>> metadata;
 
         private:
-            container_property() {}
             bool m_valid;
         };
     }

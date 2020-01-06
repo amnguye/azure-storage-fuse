@@ -68,6 +68,19 @@ set(AZURE_STORAGE_HEADER
   azure-storage-cpp-lite/include/todo/get_blob_properties_request.h
   azure-storage-cpp-lite/include/todo/query_entities_request.h
   azure-storage-cpp-lite/include/todo/set_blob_metadata_request.h
+
+  azure-storage-cpp-lite/adls/include/json.hpp
+  azure-storage-cpp-lite/adls/include/adls_client.h
+  azure-storage-cpp-lite/adls/include/adls_request_base.h
+  azure-storage-cpp-lite/adls/include/create_directory_request.h
+  azure-storage-cpp-lite/adls/include/delete_directory_request.h
+  azure-storage-cpp-lite/adls/include/set_access_control_request.h
+  azure-storage-cpp-lite/adls/include/get_access_control_request.h
+  azure-storage-cpp-lite/adls/include/list_paths_request.h
+  azure-storage-cpp-lite/adls/include/create_file_request.h
+  azure-storage-cpp-lite/adls/include/append_data_request.h
+  azure-storage-cpp-lite/adls/include/flush_data_request.h
+  azure-storage-cpp-lite/adls/include/rename_file_request.h
 )
 
 set(AZURE_STORAGE_SOURCE
@@ -105,7 +118,19 @@ set(AZURE_STORAGE_SOURCE
   azure-storage-cpp-lite/src/blob/blob_client.cpp
   azure-storage-cpp-lite/src/blob/blob_client_wrapper.cpp
   azure-storage-cpp-lite/src/blob/blob_client_attr_cache_wrapper.cpp
+
+  azure-storage-cpp-lite/adls/src/adls_client.cpp
+  azure-storage-cpp-lite/adls/src/create_directory_request.cpp
+  azure-storage-cpp-lite/adls/src/delete_directory_request.cpp
+  azure-storage-cpp-lite/adls/src/set_access_control_request.cpp
+  azure-storage-cpp-lite/adls/src/get_access_control_request.cpp
+  azure-storage-cpp-lite/adls/src/list_paths_request.cpp
+  azure-storage-cpp-lite/adls/src/create_file_request.cpp
+  azure-storage-cpp-lite/adls/src/append_data_request.cpp
+  azure-storage-cpp-lite/adls/src/flush_data_request.cpp
+  azure-storage-cpp-lite/adls/src/rename_file_request.cpp
 )
+
 
 set (BLOBFUSE_HEADER
   blobfuse/blobfuse.h
@@ -138,7 +163,7 @@ if(UNIX)
   add_definitions(-D_FILE_OFFSET_BITS=64)
   set(WARNING "-Wall -Wextra -Werror -pedantic -pedantic-errors")
   set(CMAKE_CXX_FLAGS "${CMAKE_THREAD_LIBS_INIT} ${WARNING} ${CMAKE_CXX_FLAGS}")
-  include_directories(${CMAKE_SOURCE_DIR}/blobfuse ${CMAKE_SOURCE_DIR}/azure-storage-cpp-lite/include ${CURL_INCLUDE_DIRS} ${GNUTLS_INCLUDE_DIR} ${Boost_INCLUDE_DIR} nlohmann-json)
+  include_directories(${CMAKE_SOURCE_DIR}/blobfuse ${CMAKE_SOURCE_DIR}/azure-storage-cpp-lite/include ${CMAKE_SOURCE_DIR}/azure-storage-cpp-lite/adls/include ${CURL_INCLUDE_DIRS} ${GNUTLS_INCLUDE_DIR} ${Boost_INCLUDE_DIR} nlohmann-json)
 
   set(CMAKE_MACOSX_RPATH ON)
 
@@ -225,7 +250,7 @@ if(INCLUDE_TESTS)
   add_definitions(-std=c++11)
   pkg_search_module(UUID REQUIRED uuid)
   include_directories(${Boost_INCLUDE_DIR})
-  add_executable(blobfusetests ${BLOBFUSE_HEADER} ${BLOBFUSE_SOURCE} ${AZURE_STORAGE_HEADER} ${AZURE_STORAGE_SOURCE} blobfuse/blobfuse.cpp test/cpplitetests.cpp test/attribcachetests.cpp test/attribcachesynchronizationtests.cpp)
+  add_executable(blobfusetests ${BLOBFUSE_HEADER} ${BLOBFUSE_SOURCE} ${AZURE_STORAGE_HEADER} ${AZURE_STORAGE_SOURCE} ${AZURE_STORAGE_ADLS_SOURCES} blobfuse/blobfuse.cpp test/cpplitetests.cpp test/attribcachetests.cpp test/attribcachesynchronizationtests.cpp)
   target_link_libraries(blobfusetests ${CURL_LIBRARIES} ${GNUTLS_LIBRARIES} ${CMAKE_THREAD_LIBS_INIT} ${UUID_LIBRARIES} ${Boost_FILESYSTEM_LIBRARY} ${Boost_SYSTEM_LIBRARY} ${Boost_THREAD_LIBRARY} fuse gcrypt gmock_main)
 
 endif()

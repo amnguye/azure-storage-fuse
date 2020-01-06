@@ -24,16 +24,17 @@ namespace microsoft_azure {
             add_content_length(h, headers, 0);
             add_ms_header(h, headers, constants::header_ms_client_request_id, r.ms_client_request_id(), true);
 
-            switch (r.ms_blob_public_access()) {
-            case create_container_request_base::blob_public_access::blob:
-                add_ms_header(h, headers, constants::header_ms_blob_public_access, constants::header_value_blob_public_access_blob);
-                break;
-            case create_container_request_base::blob_public_access::container:
-                add_ms_header(h, headers, constants::header_ms_blob_public_access, constants::header_value_blob_public_access_container);
-                break;
-            default:
-                break;
-            }
+        switch (r.ms_blob_public_access())
+        {
+        case create_container_request_base::blob_public_access::blob:
+            add_ms_header(h, headers, constants::header_ms_blob_public_access, constants::header_value_blob_public_access_blob);
+            break;
+        case create_container_request_base::blob_public_access::container:
+            add_ms_header(h, headers, constants::header_ms_blob_public_access, constants::header_value_blob_public_access_container);
+            break;
+        default:
+            break;
+        }
 
             //add ms-meta
 

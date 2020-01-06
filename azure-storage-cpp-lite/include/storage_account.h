@@ -17,14 +17,16 @@ namespace microsoft_azure {
                 blob,
                 table,
                 queue,
-                file
+            	file,
+            	adls
             };
 
             static std::shared_ptr<storage_account> development_storage_account();
 
             AZURE_STORAGE_API storage_account(const std::string &account_name, std::shared_ptr<storage_credential> credential, bool use_https = true, const std::string &blob_endpoint = std::string());
 
-            std::shared_ptr<storage_credential> credential() const {
+        std::shared_ptr<storage_credential> credential() const
+        {
                 return m_credential;
             }
 
@@ -36,6 +38,7 @@ namespace microsoft_azure {
             std::string m_table_domain;
             std::string m_queue_domain;
             std::string m_file_domain;
+        	std::string m_adls_domain;
 
             AZURE_STORAGE_API void append_all(const std::string &part);
         };

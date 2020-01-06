@@ -13,6 +13,7 @@
 #include "storage_account.h"
 #include "http_base.h"
 #include "xml_parser_base.h"
+#include "json_parser_base.h"
 #include "retry.h"
 #include "utility.h"
 
@@ -30,12 +31,23 @@ namespace microsoft_azure {
                 return m_xml_parser;
             }
 
+            std::shared_ptr<json_parser_base> json_parser() const
+            {
+                return m_json_parser;
+            }
+
+            void set_json_parser(std::shared_ptr<json_parser_base> parser)
+            {
+                m_json_parser = std::move(parser);
+            }
+
             std::shared_ptr<retry_policy_base> retry_policy() const {
                 return m_retry_policy;
             }
 
         private:
             std::shared_ptr<xml_parser_base> m_xml_parser;
+            std::shared_ptr<json_parser_base> m_json_parser;
             std::shared_ptr<retry_policy_base> m_retry_policy;
         };
 
@@ -254,6 +266,7 @@ namespace microsoft_azure {
                             retry->add_result(code == CURLE_OK ? result: HTTP_CODE_SERVICE_UNAVAILABLE);
                             http->reset_input_stream();
                             http->reset_output_stream();
+                            http->reset_input_buffer();
                             async_executor<void>::submit_helper(promise, outcome, account, request, http, context, retry);
                         }
                         else

@@ -11,6 +11,9 @@
 #include "storage_request_base.h"
 #include "storage_url.h"
 
+#pragma push_macro("max")
+#undef max
+
 namespace microsoft_azure {
 namespace storage {
 
@@ -102,8 +105,13 @@ inline void add_metadata_header(http_base &h, storage_headers &headers, const st
 
 AZURE_STORAGE_API bool retryable(http_base::http_code status_code);
 
-    AZURE_STORAGE_API std::string get_uuid();
-    AZURE_STORAGE_API bool create_or_resize_file(const std::string& path, unsigned long long length) noexcept;
+AZURE_STORAGE_API std::string encode_url_path(const std::string& path);
+AZURE_STORAGE_API std::string encode_url_query(const std::string& query);
+
+AZURE_STORAGE_API std::string to_lowercase(std::string str);
+
+AZURE_STORAGE_API std::string get_uuid();
+AZURE_STORAGE_API bool create_or_resize_file(const std::string& path, unsigned long long length) noexcept;
 inline bool unsuccessful(http_base::http_code status_code) {
     return !(status_code >= 200 && status_code < 300);
 }
@@ -149,3 +157,4 @@ inline lease_duration parse_lease_duration(const std::string &value) {
 
 }
 }
+#pragma pop_macro("max")

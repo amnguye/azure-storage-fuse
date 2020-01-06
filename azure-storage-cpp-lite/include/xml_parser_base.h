@@ -18,7 +18,7 @@ public:
     virtual storage_error parse_storage_error(const std::string &) const = 0;
 
     template<typename RESPONSE_TYPE>
-    RESPONSE_TYPE parse_response(const std::string &) const {}
+    RESPONSE_TYPE parse_response(const std::string &) const { return RESPONSE_TYPE();  }
 
     //virtual list_containers_response parse_list_containers_response(const std::string &xml, std::vector<list_containers_item> &items) const = 0;
 

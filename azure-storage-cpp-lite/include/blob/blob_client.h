@@ -70,8 +70,17 @@ namespace microsoft_azure { namespace storage {
         /// <summary>
         /// Gets the max parallelism used.
         /// </summary>
-        unsigned int concurrency() const {
+        unsigned int concurrency() const
+        {
             return m_client->size();
+        }
+
+        /// <summary>
+        /// Gets the executor context.
+        /// </summary>
+        std::shared_ptr<executor_context> context() const
+        {
+            return m_context;
         }
 
         /// <summary>
@@ -103,6 +112,7 @@ namespace microsoft_azure { namespace storage {
         /// <param name="blob">The blob name.</param>
         /// <param name="is">The source stream.</param>
         /// <param name="metadata">A <see cref="std::vector"> that respresents metadatas.</param>
+        /// <param name="streamlen">Length of the stream. Used only when the stream does not support tellg/seekg</param>
         /// <returns>A <see cref="std::future" /> object that represents the current operation.</returns>
         AZURE_STORAGE_API std::future<storage_outcome<void>> upload_block_blob_from_stream(const std::string &container, const std::string &blob, std::istream &is, const std::vector<std::pair<std::string, std::string>> &metadata);
 
@@ -114,7 +124,6 @@ namespace microsoft_azure { namespace storage {
         /// <param name="delete_snapshots">A bool value, delete snapshots if it is true.</param>
         /// <returns>A <see cref="std::future" /> object that represents the current operation.</returns>
         AZURE_STORAGE_API std::future<storage_outcome<void>> delete_blob(const std::string &container, const std::string &blob, bool delete_snapshots = false);
-
         /// <summary>
         /// Intitiates an asynchronous operation  to create a container.
         /// </summary>
@@ -130,11 +139,19 @@ namespace microsoft_azure { namespace storage {
         AZURE_STORAGE_API std::future<storage_outcome<void>> delete_container(const std::string &container);
 
         /// <summary>
-        /// Intitiates an asynchronous operation  to get the container property.
+        /// Intitiates a synchronous operation  to get the container property.
         /// </summary>
         /// <param name="container">The container name.</param>
-        /// <returns>A <see cref="std::future" /> object that represents the current operation.</returns>
-        AZURE_STORAGE_API storage_outcome<container_property> get_container_property(const std::string &container);
+        /// <returns>A <see cref="std::future" /> object that represents the current operation's result.</returns>
+        AZURE_STORAGE_API std::future<storage_outcome<container_property>> get_container_properties(const std::string &container);
+		
+		/// <summary>
+        /// Intitiates a synchronous operation to set the container metadata.
+        /// </summary>
+        /// <param name="container">The container name.</param>
+        /// <param name="metadata">A <see cref="std::vector"> that respresents metadatas.</param>
+        /// <returns>A <see cref="std::future" /> object that represents the current operation's result.</returns>
+        AZURE_STORAGE_API std::future<storage_outcome<void>> set_container_metadata(const std::string &container, const std::vector<std::pair<std::string, std::string>>& metadata);
 
         /// <summary>
         /// Intitiates an asynchronous operation  to list containers.
@@ -168,7 +185,16 @@ namespace microsoft_azure { namespace storage {
         /// <param name="container">The container name.</param>
         /// <param name="blob">The blob name.</param>
         /// <returns>A <see cref="std::future" /> object that represents the current operation.</returns>
-        AZURE_STORAGE_API storage_outcome<blob_property> get_blob_property(const std::string &container, const std::string &blob);
+        AZURE_STORAGE_API std::future<storage_outcome<blob_property>> get_blob_properties(const std::string &container, const std::string &blob);
+
+        /// <summary>
+        /// Intitiates a synchronous operation to set the blob metadata.
+        /// </summary>
+        /// <param name="container">The container name.</param>
+        /// <param name="blob">The blob name.</param>
+        /// <param name="metadata">A <see cref="std::vector"> that respresents metadatas.</param>
+        /// <returns>A <see cref="std::future" /> object that represents the current operation's result.</returns>
+        AZURE_STORAGE_API std::future<storage_outcome<void>> set_blob_metadata(const std::string &container, const std::string& blob, const std::vector<std::pair<std::string, std::string>>& metadata);
 
         /// <summary>
         /// Intitiates an asynchronous operation  to download the block list of a blob.
@@ -187,6 +213,28 @@ namespace microsoft_azure { namespace storage {
         /// <param name="is">The source stream.</param>
         /// <returns>A <see cref="std::future" /> object that represents the current operation.</returns>
         AZURE_STORAGE_API std::future<storage_outcome<void>> upload_block_from_stream(const std::string &container, const std::string &blob, const std::string &blockid, std::istream &is);
+
+        /// <summary>
+        /// Intitiates an asynchronous operation  to upload a block of a blob from a stream.
+        /// </summary>
+        /// <param name="container">The container name.</param>
+        /// <param name="blob">The blob name.</param>
+        /// <param name="blockid">A Base64-encoded block ID that identifies the block.</param>
+        /// <param name="is">The source stream.</param>
+        /// <param name="streamlen">Length of the stream. Used only when the stream does not support tellg/seekg</param>
+        /// <returns>A <see cref="std::future" /> object that represents the current operation.</returns>
+        AZURE_STORAGE_API std::future<storage_outcome<void>> upload_block_from_stream(const std::string &container, const std::string &blob, const std::string &blockid, std::istream &is, size_t streamlen);
+
+        /// <summary>
+        /// Intitiates an asynchronous operation  to upload a block of a blob from a char* buffer.
+        /// </summary>
+        /// <param name="container">The container name.</param>
+        /// <param name="blob">The blob name.</param>
+        /// <param name="blockid">A Base64-encoded block ID that identifies the block.</param>
+        /// <param name="buffer">The input buffer.</param>
+        /// <param name="streamlen">Length of the buffer.</param>
+        /// <returns>A <see cref="std::future" /> object that represents the current operation.</returns>
+        AZURE_STORAGE_API std::future<storage_outcome<void>> upload_block_from_buffer(const std::string &container, const std::string &blob, const std::string &blockid, char* buffer, size_t bufferlen);
 
         /// <summary>
         /// Intitiates an asynchronous operation  to create a block blob with existing blocks.
@@ -437,27 +485,27 @@ namespace microsoft_azure { namespace storage {
         /// Creates a container.
         /// </summary>
         /// <param name="container">The container name.</param>
-        void create_container(const std::string &container);
+        AZURE_STORAGE_API void create_container(const std::string &container);
 
         /// <summary>
         /// Deletes a container.
         /// </summary>
         /// <param name="container">The container name.</param>
-        void delete_container(const std::string &container);
+        AZURE_STORAGE_API void delete_container(const std::string &container);
 
         /// <summary>
         /// Examines the existance of a container.
         /// </summary>
         /// <param name="container">The container name.</param>
         /// <returns>Return true if the container does exist, otherwise, return false.</returns>
-        bool container_exists(const std::string &container);
+        AZURE_STORAGE_API bool container_exists(const std::string &container);
 
         /// <summary>
         /// List containers.
         /// </summary>
         /// <param name="prefix">The container name prefix.</param>
         /// <param name="include_metadata">A bool value, return metadatas if it is true.</param>
-        std::vector<list_containers_item> list_containers(const std::string &prefix, const std::string& continuation_token, const int max_result = 5, bool include_metadata = false);
+        AZURE_STORAGE_API std::vector<list_containers_item> list_containers(const std::string &prefix, const std::string& continuation_token, const int max_result = 5, bool include_metadata = false);
 
         /* blob level */
 
@@ -468,7 +516,7 @@ namespace microsoft_azure { namespace storage {
         /// <param name="delimiter">The delimiter used to designate the virtual directories.</param>
         /// <param name="continuation_token">A continuation token returned by a previous listing operation.</param>
         /// <param name="prefix">The blob name prefix.</param>
-        list_blobs_hierarchical_response list_blobs_hierarchical(const std::string &container, const std::string &delimiter, const std::string &continuation_token, const std::string &prefix, int maxresults = 10000);
+        AZURE_STORAGE_API list_blobs_hierarchical_response list_blobs_hierarchical(const std::string &container, const std::string &delimiter, const std::string &continuation_token, const std::string &prefix, int maxresults = 10000);
 
         /// <summary>
         /// Uploads the contents of a blob from a local file, file size need to be equal or smaller than 64MB.
@@ -477,7 +525,7 @@ namespace microsoft_azure { namespace storage {
         /// <param name="container">The container name.</param>
         /// <param name="blob">The blob name.</param>
         /// <param name="metadata">A <see cref="std::vector"> that respresents metadatas.</param>
-        void put_blob(const std::string &sourcePath, const std::string &container, const std::string blob, const std::vector<std::pair<std::string, std::string>> &metadata = std::vector<std::pair<std::string, std::string>>());
+        AZURE_STORAGE_API void put_blob(const std::string &sourcePath, const std::string &container, const std::string blob, const std::vector<std::pair<std::string, std::string>> &metadata = std::vector<std::pair<std::string, std::string>>());
 
         /// <summary>
         /// Uploads the contents of a blob from a stream.
@@ -486,7 +534,8 @@ namespace microsoft_azure { namespace storage {
         /// <param name="blob">The blob name.</param>
         /// <param name="is">The source stream.</param>
         /// <param name="metadata">A <see cref="std::vector"> that respresents metadatas.</param>
-        void upload_block_blob_from_stream(const std::string &container, const std::string blob, std::istream &is, const std::vector<std::pair<std::string, std::string>> &metadata = std::vector<std::pair<std::string, std::string>>());
+        /// <param name="streamlen">Length of the stream. Used only when the stream does not support tellg/seekg</param>
+        AZURE_STORAGE_API void upload_block_blob_from_stream(const std::string &container, const std::string blob, std::istream &is, const std::vector<std::pair<std::string, std::string>> &metadata = std::vector<std::pair<std::string, std::string>>());
 
         /// <summary>
         /// Uploads the contents of a blob from a local file.
@@ -496,7 +545,7 @@ namespace microsoft_azure { namespace storage {
         /// <param name="blob">The blob name.</param>
         /// <param name="metadata">A <see cref="std::vector"> that respresents metadatas.</param>
         /// <param name="parallel">A size_t value indicates the maximum parallelism can be used in this request.</param>
-        void upload_file_to_blob(const std::string &sourcePath, const std::string &container, const std::string blob, const std::vector<std::pair<std::string, std::string>> &metadata = std::vector<std::pair<std::string, std::string>>(), size_t parallel = 8);
+        AZURE_STORAGE_API void upload_file_to_blob(const std::string &sourcePath, const std::string &container, const std::string blob, const std::vector<std::pair<std::string, std::string>> &metadata = std::vector<std::pair<std::string, std::string>>(), size_t parallel = 8);
 
         /// <summary>
         /// Downloads the contents of a blob to a stream.
@@ -506,7 +555,7 @@ namespace microsoft_azure { namespace storage {
         /// <param name="offset">The offset at which to begin downloading the blob, in bytes.</param>
         /// <param name="size">The size of the data to download from the blob, in bytes.</param>
         /// <param name="os">The target stream.</param>
-        void download_blob_to_stream(const std::string &container, const std::string &blob, unsigned long long offset, unsigned long long size, std::ostream &os);
+        AZURE_STORAGE_API void download_blob_to_stream(const std::string &container, const std::string &blob, unsigned long long offset, unsigned long long size, std::ostream &os);
 
         /// <summary>
         /// Downloads the contents of a blob to a local file.
@@ -518,15 +567,14 @@ namespace microsoft_azure { namespace storage {
         /// <param name="destPath">The target file path.</param>
         /// <param name="parallel">A size_t value indicates the maximum parallelism can be used in this request.</param>
         /// <returns>A <see cref="storage_outcome" /> object that represents the properties (etag, last modified time and size) from the first chunk retrieved.</returns>
-        void download_blob_to_file(const std::string &container, const std::string &blob, const std::string &destPath, time_t &returned_last_modified, size_t parallel = 9);
+        AZURE_STORAGE_API void download_blob_to_file(const std::string &container, const std::string &blob, const std::string &destPath, time_t &returned_last_modified, size_t parallel = 9);
 
         /// <summary>
         /// Gets the property of a blob.
         /// </summary>
         /// <param name="container">The container name.</param>
         /// <param name="blob">The blob name.</param>
-        /// <returns> A <see cref="blob_property"/> object that represents the proerty of a particular blob
-        blob_property get_blob_property(const std::string &container, const std::string &blob);
+        AZURE_STORAGE_API blob_property get_blob_property(const std::string &container, const std::string &blob);
 
         /// <summary>
         /// Examines the existance of a blob.
@@ -534,14 +582,14 @@ namespace microsoft_azure { namespace storage {
         /// <param name="container">The container name.</param>
         /// <param name="blob">The blob name.</param>
         /// <returns>Return true if the blob does exist, otherwise, return false.</returns>
-        bool blob_exists(const std::string &container, const std::string &blob);
+        AZURE_STORAGE_API bool blob_exists(const std::string &container, const std::string &blob);
 
         /// <summary>
         /// Deletes a blob.
         /// </summary>
         /// <param name="container">The container name.</param>
         /// <param name="blob">The blob name.</param>
-        void delete_blob(const std::string &container, const std::string &blob);
+        AZURE_STORAGE_API void delete_blob(const std::string &container, const std::string &blob);
 
         /// <summary>
         /// Copy a blob to another.
@@ -550,7 +598,7 @@ namespace microsoft_azure { namespace storage {
         /// <param name="sourceBlob">The source blob name.</param>
         /// <param name="destContainer">The destination container name.</param>
         /// <param name="destBlob">The destination blob name.</param>
-        void start_copy(const std::string &sourceContainer, const std::string &sourceBlob, const std::string &destContainer, const std::string &destBlob);
+        AZURE_STORAGE_API void start_copy(const std::string &sourceContainer, const std::string &sourceBlob, const std::string &destContainer, const std::string &destBlob);
     private:
         blob_client_wrapper() {}
 
@@ -558,6 +606,8 @@ namespace microsoft_azure { namespace storage {
         std::mutex s_mutex;
         unsigned int m_concurrency;
         bool m_valid;
+		
+		static const size_t NOT_USER_DEFINED_STREAMLEN = (std::numeric_limits<size_t>::max)();
     };
 
         /// <summary>

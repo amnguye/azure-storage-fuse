@@ -19,6 +19,8 @@
 
 #include "http_base.h"
 
+#pragma push_macro("min")
+#undef min
 namespace microsoft_azure {
     namespace storage {
 
@@ -51,6 +53,7 @@ namespace microsoft_azure {
                 }
 
                 void add_header(const std::string &name, const std::string &value) override {
+            m_request_headers.emplace(name, value);
                     std::string header(name);
                     header.append(": ").append(value);
                     m_slist = curl_slist_append(m_slist, header.data());
@@ -62,41 +65,52 @@ namespace microsoft_azure {
                     }
                 }
 
-                std::string get_header(const std::string &name) const override {
-                    auto iter = m_headers.find(name);
-                    if (iter != m_headers.end())
-                    {
-                        return iter->second;
-                    }
-                    else
-                    {
-                        return "";
-                    }
-                }
-                const std::map<std::string, std::string, case_insensitive_compare>& get_headers() const override {
-                    return m_headers;
-                }
+        const std::map<std::string, std::string, case_insensitive_compare>& get_request_headers() const override
+        {
+            return m_request_headers;
+        }
+        std::string get_response_header(const std::string &name) const override
+        {
+            auto iter = m_response_headers.find(name);
+            if (iter != m_response_headers.end())
+            {
+            	return iter->second;
+            }
+            else
+            {
+            	return "";
+            }
+        }
+        
+		const std::map<std::string, std::string, case_insensitive_compare>& get_response_headers() const override
+        {
+        	return m_response_headers;
+        }
 
-                AZURE_STORAGE_API CURLcode perform() override;
+        AZURE_STORAGE_API CURLcode perform() override;
 
-                void submit(std::function<void(http_code, storage_istream, CURLcode)> cb, std::chrono::seconds interval) override {
-                    std::this_thread::sleep_for(interval);
-                    const auto curlCode = perform();
-                    cb(m_code, m_error_stream, curlCode);
-                }
+        void submit(std::function<void(http_code, storage_istream, CURLcode)> cb, std::chrono::seconds interval) override
+        {
+            std::this_thread::sleep_for(interval);
+            const auto curlCode = perform();
+            cb(m_code, m_error_stream, curlCode);
+        }
 
-                void reset() override {
-                    m_headers.clear();
-                    curl_slist_free_all(m_slist);
-                    m_slist = NULL;
-                    //curl_easy_setopt(m_curl, CURLOPT_INFILESIZE, -1);
-                    //curl_easy_setopt(m_curl, CURLOPT_WRITEFUNCTION, NULL);
-                    //curl_easy_setopt(m_curl, CURLOPT_READFUNCTION, NULL);
-                }
+        void reset() override
+        {
+            m_request_headers.clear();
+            m_response_headers.clear();
+            curl_slist_free_all(m_slist);
+            m_slist = NULL;
+            //curl_easy_setopt(m_curl, CURLOPT_INFILESIZE, -1);
+            //curl_easy_setopt(m_curl, CURLOPT_WRITEFUNCTION, NULL);
+            //curl_easy_setopt(m_curl, CURLOPT_READFUNCTION, NULL);
+        }
 
-                http_code status_code() const override {
-                    return m_code;
-                }
+        http_code status_code() const override
+        {
+            return m_code;
+        }
 
                 /*void set_output_callback(OUT_CB output_callback) override {
                     m_output_callback = output_callback;
@@ -110,24 +124,25 @@ namespace microsoft_azure {
                     check_code(curl_easy_setopt(m_curl, CURLOPT_READDATA, this));
                 }*/
 
-                void set_output_stream(storage_ostream s) override {
-                    m_output_stream = s;
-                    check_code(curl_easy_setopt(m_curl, CURLOPT_WRITEFUNCTION, write));
-                    check_code(curl_easy_setopt(m_curl, CURLOPT_WRITEDATA, this));
-                }
+        void set_output_stream(storage_ostream s) override
+        {
+            m_output_stream = s;
+            check_code(curl_easy_setopt(m_curl, CURLOPT_WRITEFUNCTION, write));
+            check_code(curl_easy_setopt(m_curl, CURLOPT_WRITEDATA, this));
+        }
 
-                void set_error_stream(std::function<bool(http_code)> f, storage_iostream s) override {
-                    m_switch_error_callback = f;
-                    m_error_stream = s;
-                    //check_code(curl_easy_setopt(m_curl, CURLOPT_WRITEFUNCTION, write));
-                    //check_code(curl_easy_setopt(m_curl, CURLOPT_WRITEDATA, this));
-                }
+        void set_error_stream(std::function<bool(http_code)> f, storage_iostream s) override
+        {
+            m_switch_error_callback = f;
+            m_error_stream = s;
+        }
 
-                void set_input_stream(storage_istream s) override {
-                    m_input_stream = s;
-                    check_code(curl_easy_setopt(m_curl, CURLOPT_READFUNCTION, read));
-                    check_code(curl_easy_setopt(m_curl, CURLOPT_READDATA, this));
-                }
+        void set_input_stream(storage_istream s) override
+        {
+            m_input_stream = s;
+            check_code(curl_easy_setopt(m_curl, CURLOPT_READFUNCTION, read));
+            check_code(curl_easy_setopt(m_curl, CURLOPT_READDATA, this));
+        }
 
                 void set_input_buffer(char* buff) override
                 {
@@ -157,8 +172,13 @@ namespace microsoft_azure {
                 }
                 void reset_input_stream() override {
                     m_input_stream.reset();
+            m_input_read_pos = 0;
                 }
 
+        void reset_input_buffer() override
+        {
+            m_input_read_pos = 0;
+        }
                 void reset_output_stream() override {
                     m_output_stream.reset();
                 }
@@ -196,19 +216,21 @@ namespace microsoft_azure {
                 std::shared_ptr<CurlEasyClient> m_client;
                 CURL *m_curl;
                 curl_slist *m_slist;
+        std::map<std::string, std::string, case_insensitive_compare> m_request_headers;
 
                 http_method m_method;
                 std::string m_url;
-                char* m_input_buffer = NULL;
+                const char *m_input_buffer = nullptr;
                 int m_input_buffer_pos = 0;
                 storage_istream m_input_stream;
                 storage_ostream m_output_stream;
                 storage_iostream m_error_stream;
-                size_t m_input_content_length;
-                bool m_is_input_length_known;
+        size_t m_input_content_length = 0;
+        size_t m_input_read_pos = 0;
+        bool m_is_input_length_known = false;
                 std::function<bool(http_code)> m_switch_error_callback;
                 http_code m_code;
-                std::map<std::string, std::string, case_insensitive_compare> m_headers;
+        std::map<std::string, std::string, case_insensitive_compare> m_response_headers;
 
                 AZURE_STORAGE_API static size_t header_callback(char *buffer, size_t size, size_t nitems, void *userdata);
 
@@ -228,39 +250,41 @@ namespace microsoft_azure {
 
                 static size_t read(char *buffer, size_t size, size_t nitems, void *userdata)
                 {
-                    REQUEST_TYPE *p = static_cast<REQUEST_TYPE *>(userdata);
-                    auto &s = p->m_input_stream.istream();
-                    size_t contentlen = p->get_input_content_length();
-                    size_t actual_size = 0 ;
-                    if( ! p->get_is_input_length_known() ) {
-                        auto cur = s.tellg();
-                        s.seekg(0, std::ios_base::end);
-                        auto end = s.tellg();
-                        s.seekg(cur);
-                        actual_size = std::min(static_cast<size_t>(end-cur), size * nitems);
-                    }
-                    else
-                    {
-                        actual_size = std::min(contentlen, size * nitems);
-                    }
+            REQUEST_TYPE *p = static_cast<REQUEST_TYPE *>(userdata);
 
-                    if (p->m_input_buffer != NULL)
-                    {
-                        memcpy(buffer, p->m_input_buffer + p->m_input_buffer_pos, actual_size);
-                        p->m_input_buffer_pos += actual_size;
-                    }
-                    else
-                    {
-                        s.read(buffer, actual_size);
-                    }
-
-                    if(p->get_is_input_length_known()) {
-                        contentlen -= actual_size;
-                        p->set_input_content_length(contentlen);
-                    }
-
-                    return actual_size;
+            size_t actual_size = 0;
+            if (p->m_input_stream.valid())
+            {
+                auto &s = p->m_input_stream.istream();
+                if (p->get_is_input_length_known())
+                {
+                    actual_size = std::min(size * nitems, p->m_input_content_length - p->m_input_read_pos);
                 }
+                else
+                {
+                    std::streampos cur_pos = s.tellg();
+                    s.seekg(0, std::ios_base::end);
+                    std::streampos end_pos = s.tellg();
+                    s.seekg(cur_pos, std::ios_base::beg);
+                    actual_size = std::min(size * nitems, static_cast<size_t>(end_pos - cur_pos));
+                }
+                s.read(buffer, actual_size);
+                if (s.fail())
+                {
+                    return CURL_READFUNC_ABORT;
+                }
+                actual_size = static_cast<size_t>(s.gcount());
+                p->m_input_read_pos += actual_size;
+            }
+            else if (p->m_input_buffer != nullptr)
+            {
+                actual_size = std::min(size * nitems, p->m_input_content_length - p->m_input_read_pos);
+                memcpy(buffer, p->m_input_buffer + p->m_input_read_pos, actual_size);
+                p->m_input_read_pos += actual_size;
+            }
+
+            return actual_size;
+        }
 
                 static void check_code(CURLcode code, std::string = std::string())
                 {
@@ -329,3 +353,5 @@ namespace microsoft_azure {
         };
     }
 }
+
+#pragma pop_macro("min")

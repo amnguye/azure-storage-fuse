@@ -31,6 +31,7 @@ namespace microsoft_azure {
                 m_table_domain.append(".table");
                 m_queue_domain.append(".queue");
                 m_file_domain.append(".file");
+            	m_adls_domain.append(".dfs");
 
                 append_all(constants::default_endpoint_suffix);
             }
@@ -55,6 +56,9 @@ namespace microsoft_azure {
             case storage_account::service::file:
                 url.set_domain(m_file_domain);
                 break;
+        	case storage_account::service::adls:
+            	url.set_domain(m_adls_domain);
+            	break;
             }
 
             return url;
@@ -65,6 +69,7 @@ namespace microsoft_azure {
             m_table_domain.append(part);
             m_queue_domain.append(part);
             m_file_domain.append(part);
+        	m_adls_domain.append(part);
         }
 
     }

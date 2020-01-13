@@ -119,25 +119,6 @@ std::future<storage_outcome<void>> blob_client::upload_block_blob_from_stream(co
     return async_executor<void>::submit(m_account, request, http, m_context);
 }
 
-std::future<storage_outcome<void>> blob_client::upload_block_blob_from_stream(const std::string &container, const std::string &blob, std::istream &is, const std::vector<std::pair<std::string, std::string>> &metadata, size_t streamlen)
-{
-    auto http = m_client->get_handle();
-
-    auto request = std::make_shared<create_block_blob_request>(container, blob);
-
-    request->set_content_length(static_cast<unsigned int>(streamlen));
-    if (metadata.size() > 0)
-    {
-        request->set_metadata(metadata);
-    }
-
-    http->set_input_stream(storage_istream(is));
-    http->set_is_input_length_known();
-    http->set_input_content_length(streamlen);
-
-    return async_executor<void>::submit(m_account, request, http, m_context);
-}
-
 std::future<storage_outcome<void>> blob_client::upload_block_from_buffer(const std::string &container, const std::string &blob, const std::string &blockid, char* buff, size_t bufferlen)
 {
     auto http = m_client->get_handle();
@@ -355,20 +336,6 @@ std::future<storage_outcome<void>> blob_client::upload_block_from_stream(const s
     request->set_content_length(static_cast<unsigned int>(end - cur));
 
     http->set_input_stream(storage_istream(is));
-
-    return async_executor<void>::submit(m_account, request, http, m_context);
-}
-
-std::future<storage_outcome<void>> blob_client::upload_block_from_stream(const std::string &container, const std::string &blob, const std::string &blockid, std::istream &is, size_t streamlen)
-{
-    auto http = m_client->get_handle();
-
-    auto request = std::make_shared<put_block_request>(container, blob, blockid);
-    request->set_content_length(static_cast<unsigned int>(streamlen));
-
-    http->set_input_stream(storage_istream(is));
-    http->set_is_input_length_known();
-    http->set_input_content_length(streamlen);
 
     return async_executor<void>::submit(m_account, request, http, m_context);
 }

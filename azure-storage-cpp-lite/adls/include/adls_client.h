@@ -329,8 +329,8 @@ namespace microsoft_azure { namespace storage_adls {
         }
 
     private:
-        std::shared_ptr<microsoft_azure::storage::blob_client> m_blob_client;
         std::shared_ptr<storage_account> m_account;
+        std::shared_ptr<microsoft_azure::storage::blob_client> m_blob_client;
         std::shared_ptr<executor_context> m_context;
 
         const bool m_exception_enabled;

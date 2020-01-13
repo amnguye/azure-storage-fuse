@@ -7,7 +7,7 @@ namespace microsoft_azure { namespace storage_adls {
 
     void create_file_request::build_request(const storage_account& account, http_base& http) const
     {
-        using namespace azure::storage_lite;
+        using namespace microsoft_azure::storage;
 
         http.set_method(http_base::http_method::put);
 

@@ -16,6 +16,6 @@ namespace microsoft_azure {
 	        RESPONSE_TYPE parse_response(const std::string &) const { return RESPONSE_TYPE(); }
 	    };
 
-    	
+    inline json_parser_base::~json_parser_base() {}
 
 }}   // azure::storage_lite

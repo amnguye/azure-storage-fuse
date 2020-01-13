@@ -1,4 +1,5 @@
 #include "storage_url.h"
+#include "utility.h"
 
 namespace microsoft_azure {
     namespace storage {
@@ -42,57 +43,15 @@ namespace microsoft_azure {
             return is_path_character(ch) || ch == '?';
         }
 
-        std::string encode_url_path(const std::string& path)
-        {
-            const char* const hex = "0123456789ABCDEF";
-            std::string encoded;
-            for(size_t index = 0; index < path.size(); ++index)
-            {
-                char ch = path[index];
-                if(!is_path_character(ch)
-                    || ch == '%'
-                    || ch == '+'
-                    || ch == '&')
-                {
-                    encoded.push_back('%');
-                    encoded.push_back(hex[ (ch >> 4) & 0xF]);
-                    encoded.push_back(hex[ ch & 0xF ]);
-                }
-                else
-                {
-                    encoded.push_back(ch);
-                }
-            }
-            return encoded;
-        }
+    std::string storage_url::get_encoded_path() const
+    {
+        return encode_url_path(m_path);
+    }
 
-        std::string encode_url_query(const std::string& path)
-        {
-            const char* const hex = "0123456789ABCDEF";
-            std::string encoded;
-            for(size_t index = 0; index < path.size(); ++index)
-            {
-                char ch = path[index];
-                if(!is_query_character(ch)
-                    || ch == '%'
-                    || ch == '+'
-                    || ch == '&')
-                {
-                    encoded.push_back('%');
-                    encoded.push_back(hex[ (ch >> 4) & 0xF]);
-                    encoded.push_back(hex[ ch & 0xF ]);
-                }
-                else
-                {
-                    encoded.push_back(ch);
-                }
-            }
-            return encoded;
-        }
-
-        std::string storage_url::to_string() const {
-            std::string url(m_domain);
-            url.append(encode_url_path(m_path));
+    std::string storage_url::to_string() const
+    {
+        std::string url(m_domain);
+        url.append(encode_url_path(m_path));
 
             bool first_query = true;
             for (const auto &q : m_query) {

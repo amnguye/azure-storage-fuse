@@ -10,8 +10,6 @@
 namespace microsoft_azure {
     namespace storage {
 
-        std::string encode_url_path(const std::string& path);
-
         class storage_url {
         public:
             storage_url &set_domain(const std::string &domain) {
@@ -32,9 +30,7 @@ namespace microsoft_azure {
                 return m_path;
             }
 
-            std::string get_encoded_path() const {
-                return encode_url_path(m_path);
-            }
+        	AZURE_STORAGE_API std::string get_encoded_path() const;
 
             storage_url &add_query(const std::string &name, const std::string &value) {
                 m_query[name].insert(value);

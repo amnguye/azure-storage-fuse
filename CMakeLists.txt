@@ -42,6 +42,8 @@ set(AZURE_STORAGE_HEADER
   azure-storage-cpp-lite/include/append_block_request_base.h
   azure-storage-cpp-lite/include/put_page_request_base.h
   azure-storage-cpp-lite/include/get_page_ranges_request_base.h
+  azure-storage-cpp-lite/include/set_blob_metadata_request_base.h
+  azure-storage-cpp-lite/include/set_container_metadata_request_base.h
 
   azure-storage-cpp-lite/include/http_base.h
   azure-storage-cpp-lite/include/http/libcurl_http_client.h
@@ -63,6 +65,8 @@ set(AZURE_STORAGE_HEADER
   azure-storage-cpp-lite/include/blob/append_block_request.h
   azure-storage-cpp-lite/include/blob/put_page_request.h
   azure-storage-cpp-lite/include/blob/get_page_ranges_request.h
+  azure-storage-cpp-lite/include/blob/set_blob_metadata_request.h
+  azure-storage-cpp-lite/include/blob/set_container_metadata_request.h
 
   azure-storage-cpp-lite/include/todo/get_blob_metadata_request.h
   azure-storage-cpp-lite/include/todo/get_blob_properties_request.h
@@ -112,6 +116,8 @@ set(AZURE_STORAGE_SOURCE
   azure-storage-cpp-lite/src/append_block_request_base.cpp
   azure-storage-cpp-lite/src/put_page_request_base.cpp
   azure-storage-cpp-lite/src/get_page_ranges_request_base.cpp
+  azure-storage-cpp-lite/src/set_blob_metadata_request_base.cpp
+  azure-storage-cpp-lite/src/set_container_metadata_request_base.cpp
 
   azure-storage-cpp-lite/src/http/libcurl_http_client.cpp
 

@@ -12,6 +12,7 @@
 
 #include <cerrno>
 #include <functional>
+#include <syslog.h>
 
 namespace microsoft_azure { namespace storage_adls {
 
@@ -43,7 +44,7 @@ namespace microsoft_azure { namespace storage_adls {
                 }
                 else
                 {
-                    microsoft_azure::storage::logger::error(result.error().code_name + ": " + result.error().message);
+                    syslog(LOG_ERR, "%s:%s", result.error().code_name.c_str(), result.error().message.c_str());
                     errno = error_code;
                 }
             }
@@ -58,7 +59,7 @@ namespace microsoft_azure { namespace storage_adls {
             }
             else
             {
-                microsoft_azure::storage::logger::error("Unknown failure: %s", e.what());
+                syslog(LOG_ERR, "Unknown failure: %s", e.what());
                 errno = unknown_error;
             }
         }

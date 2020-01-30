@@ -30,7 +30,6 @@ struct options
 struct options options;
 struct str_options str_options;
 int file_cache_timeout_in_seconds;
-int default_permission;
 
 #define OPTION(t, p) { t, offsetof(struct options, p), 1 }
 const struct fuse_opt option_spec[] =
@@ -50,14 +49,6 @@ const struct fuse_opt option_spec[] =
 };
 
 std::shared_ptr<sync_blob_client> azure_blob_client_wrapper;
-class gc_cache gc_cache;
-
-// Currently, the cpp lite lib puts the HTTP status code in errno.
-// This mapping tries to convert the HTTP status code to a standard Linux errno.
-// TODO: Ensure that we map any potential HTTP status codes we might receive.
-std::map<int, int> error_mapping = {{404, ENOENT}, {403, EACCES}, {1600, ENOENT}};
-
-const std::string former_directory_signifier = ".directory";
 
 static struct fuse_operations azs_blob_operations;
 
@@ -498,11 +489,11 @@ int read_and_set_arguments(int argc, char *argv[], struct fuse_args *args)
     *args = FUSE_ARGS_INIT(argc, argv);
 
     // Check for existence of allow_other flag and change the default permissions based on that
-    default_permission = 0770;
+    str_options.default_permission = 0770;
     std::vector<std::string> string_args(argv, argv+argc);
     for (size_t i = 1; i < string_args.size(); ++i) {
       if (string_args[i].find("allow_other") != std::string::npos) {
-          default_permission = 0777; 
+          str_options.default_permission = 0777;
       }
     }
 

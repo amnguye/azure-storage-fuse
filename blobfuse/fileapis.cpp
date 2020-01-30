@@ -1,35 +1,6 @@
 #include "blobfuse.h"
 #include <sys/file.h>
 
-file_lock_map* file_lock_map::get_instance()
-{
-    if(nullptr == s_instance.get())
-    {
-        std::lock_guard<std::mutex> lock(s_mutex);
-        if(nullptr == s_instance.get())
-        {
-            s_instance.reset(new file_lock_map());
-        }
-    }
-    return s_instance.get();
-}
-
-std::shared_ptr<std::mutex> file_lock_map::get_mutex(const std::string& path)
-{
-    std::lock_guard<std::mutex> lock(m_mutex);
-    auto iter = m_lock_map.find(path);
-    if(iter == m_lock_map.end())
-    {
-        auto file_mutex = std::make_shared<std::mutex>();
-        m_lock_map[path] = file_mutex;
-        return file_mutex;
-    }
-    else
-    {
-        return iter->second;
-    }
-}
-
 std::shared_ptr<file_lock_map> file_lock_map::s_instance;
 std::mutex file_lock_map::s_mutex;
 
@@ -113,7 +84,7 @@ int azs_open(const char *path, struct fuse_file_info *fi)
 
             errno = 0;
             time_t last_modified = {};
-            azure_blob_client_wrapper->download_blob_to_file(str_options.containerName, pathString.substr(1), mntPathString, last_modified);
+            storage_client->DownloadToFile(pathString.substr(1), mntPathString);
             if (errno != 0)
             {
                 int storage_errno = errno;
@@ -159,7 +130,7 @@ int azs_open(const char *path, struct fuse_file_info *fi)
     }
 
     // TODO: Actual access control
-    fchmod(res, default_permission);
+    fchmod(res, str_options.default_permission);
 
     // Store the open file handle, and whether or not the file should be uploaded on close().
     // TODO: Optimize the scenario where the file is open for read/write, but no actual writing occurs, to not upload the blob.
@@ -211,7 +182,7 @@ int azs_create(const char *path, mode_t mode, struct fuse_file_info *fi)
     ensure_files_directory_exists_in_cache(mntPathString);
 
     // FUSE will set the O_CREAT and O_WRONLY flags, but not O_EXCL, which is generally assumed for 'create' semantics.
-    res = open(mntPath, fi->flags | O_EXCL, default_permission);
+    res = open(mntPath, fi->flags | O_EXCL, str_options.default_permission);
     if (res == -1)
     {
         syslog(LOG_ERR, "Failure to open cache file %s in azs_open.  errno = %d\n.", path, errno);
@@ -332,7 +303,7 @@ int azs_flush(const char *path, struct fuse_file_info *fi)
             std::vector<std::pair<std::string, std::string>> metadata;
             std::string blob_name = mntPathString.substr(str_options.tmpPath.size() + 6 /* there are six characters in "/root/" */);
             errno = 0;
-            azure_blob_client_wrapper->upload_file_to_blob(mntPath, str_options.containerName, blob_name, metadata, 8);
+            storage_client->UploadFromFile(mntPath);
             if (errno != 0)
             {
                 int storage_errno = errno;
@@ -425,7 +396,7 @@ int azs_unlink(const char *path)
 
     int retval = 0;
     errno = 0;
-    azure_blob_client_wrapper->delete_blob(str_options.containerName, pathString.substr(1));
+    storage_client->DeleteFile(pathString.substr(1));
     if (errno != 0)
     {
         int storage_errno = errno;
@@ -523,7 +494,7 @@ int azs_truncate(const char * path, off_t off)
 
             std::vector<std::pair<std::string, std::string>> metadata;
             errno = 0;
-            azure_blob_client_wrapper->upload_block_blob_from_stream(str_options.containerName, pathString.substr(1), emptyDataStream, metadata);
+            storage_client->UploadFromStream(emptyDataStream, pathString.substr(1).c_str());
             if (errno != 0)
             {
                 syslog(LOG_ERR, "Failed to upload zero-length blob to %s from azs_truncate.  errno = %d\n.", pathString.c_str()+1, errno);
@@ -547,7 +518,7 @@ int azs_truncate(const char * path, off_t off)
         AZS_DEBUGLOGV("File to truncate %s does not exist in the local cache.\n", path);
 
         // The blob/file does not exist locally.  We need to see if it exists on the service (if it doesn't we return ENOENT.)
-        if (azure_blob_client_wrapper->blob_exists(str_options.containerName, pathString.substr(1))) // TODO: Once we have support for access conditions, we could remove this call, and replace with a put_block_list with if-match-*
+        if (storage_client->Exists(pathString.substr(1))) // TODO: Once we have support for access conditions, we could remove this call, and replace with a put_block_list with if-match-*
         {
             AZS_DEBUGLOGV("Blob %s representing file %s exists on the service.\n", pathString.c_str()+1, path);
 
@@ -560,10 +531,8 @@ int azs_truncate(const char * path, off_t off)
 
             // We want to upload a zero-length blob.
             std::istringstream emptyDataStream("");
-
-            std::vector<std::pair<std::string, std::string>> metadata;
             errno = 0;
-            azure_blob_client_wrapper->upload_block_blob_from_stream(str_options.containerName, pathString.substr(1), emptyDataStream, metadata);
+            storage_client->UploadFromStream(emptyDataStream, pathString.substr(1).c_str());
             if (errno != 0)
             {
                 int storage_errno = errno;
@@ -589,170 +558,7 @@ int azs_rename_single_file(const char *src, const char *dst)
 {
     AZS_DEBUGLOGV("Renaming a single file.  src = %s, dst = %s.\n", src, dst);
 
-    // TODO: if src == dst, return?
-    // TODO: lock in alphabetical order?
-    auto fsrcmutex = file_lock_map::get_instance()->get_mutex(src);
-    std::lock_guard<std::mutex> locksrc(*fsrcmutex);
 
-    auto fdstmutex = file_lock_map::get_instance()->get_mutex(dst);
-    std::lock_guard<std::mutex> lockdst(*fdstmutex);
-
-    std::string srcPathString(src);
-    const char * srcMntPath;
-    std::string srcMntPathString = prepend_mnt_path_string(srcPathString);
-    srcMntPath = srcMntPathString.c_str();
-
-    std::string dstPathString(dst);
-    const char * dstMntPath;
-    std::string dstMntPathString = prepend_mnt_path_string(dstPathString);
-    dstMntPath = dstMntPathString.c_str();
-
-    struct stat buf;
-    int statret = stat(srcMntPath, &buf);
-    if (statret == 0)
-    {
-        AZS_DEBUGLOGV("Source file %s in rename operation exists in the local cache.\n", src);
-
-        // The file exists in the local cache.  Call rename() on it (note this will preserve existing handles.)
-        ensure_files_directory_exists_in_cache(dstMntPath);
-        errno = 0;
-        int renameret = rename(srcMntPath, dstMntPath);
-        if (renameret < 0)
-        {
-            syslog(LOG_ERR, "Failure to rename source file %s in the local cache.  Errno = %d.\n", src, errno);
-            return -errno;
-        }
-        else
-        {
-            AZS_DEBUGLOGV("Successfully to renamed file %s to %s in the local cache.\n", src, dst);
-        }
-        errno = 0;
-        auto blob_property = azure_blob_client_wrapper->get_blob_property(str_options.containerName, srcPathString.substr(1));
-        if ((errno == 0) && blob_property.valid())
-        {
-            AZS_DEBUGLOGV("Source file %s for rename operation exists as a blob on the service.\n", src);
-            // Blob also exists on the service.  Perform a server-side copy.
-            errno = 0;
-            azure_blob_client_wrapper->start_copy(str_options.containerName, srcPathString.substr(1), str_options.containerName, dstPathString.substr(1));
-            if (errno != 0)
-            {
-                int storage_errno = errno;
-                syslog(LOG_ERR, "Attempt to call start_copy from %s to %s failed.  errno = %d\n.", srcPathString.c_str()+1, dstPathString.c_str()+1, storage_errno);
-                return 0 - map_errno(errno);
-            }
-            else
-            {
-                syslog(LOG_INFO, "Successfully called start_copy from blob %s to blob %s\n", srcPathString.c_str()+1, dstPathString.c_str()+1);
-            }
-
-            errno = 0;
-            do
-            {
-                blob_property = azure_blob_client_wrapper->get_blob_property(str_options.containerName, dstPathString.substr(1));
-            }
-            while(errno == 0 && blob_property.valid() && blob_property.copy_status.compare(0, 7, "pending") == 0);
-            if(blob_property.copy_status.compare(0, 7, "success") == 0)
-            {
-                syslog(LOG_INFO, "Copy operation from %s to %s succeeded.", srcPathString.c_str()+1, dstPathString.c_str()+1);
-
-//                int retval = azs_unlink(srcPathString); // This will remove the blob from the service, and also take care of removing the directory in the local file cache.
-                azure_blob_client_wrapper->delete_blob(str_options.containerName, srcPathString.substr(1));
-                if(errno != 0)
-                {
-                    int storage_errno = errno;
-                    syslog(LOG_ERR, "Failed to delete source blob %s during rename operation.  errno = %d\n.", srcPathString.c_str()+1, storage_errno);
-                    return 0 - map_errno(storage_errno);
-                }
-                else
-                {
-                    syslog(LOG_INFO, "Successfully deleted source blob %s during rename operation.\n", srcPathString.c_str()+1);
-                }
-            }
-            else
-            {
-                syslog(LOG_ERR, "Copy operation from %s to %s failed on the service.  Copy status = %s.\n", srcPathString.c_str()+1, dstPathString.c_str()+1, blob_property.copy_status.c_str());
-                return EFAULT;
-            }
-
-            // store the file in the cleanup list
-            g_gc_cache.add_file(dstPathString);
-
-            return 0;
-        }
-        else if (errno != 0)
-        {
-            int storage_errno = errno;
-            syslog(LOG_ERR, "Failed to get blob properties for blob %s during rename operation.  errno = %d\n", srcPathString.c_str()+1, storage_errno);
-            return 0 - map_errno(storage_errno);
-        }
-    }
-    else
-    {
-        AZS_DEBUGLOGV("Source file %s in rename operation does not exist in the local cache.\n", src);
-
-        // File does not exist locally.  Just do the blob copy.
-        // TODO: remove duplicated code.
-        errno = 0;
-        auto blob_property = azure_blob_client_wrapper->get_blob_property(str_options.containerName, srcPathString.substr(1));
-        if ((errno == 0) && blob_property.valid())
-        {
-            AZS_DEBUGLOGV("Source file %s for rename operation exists as a blob on the service.\n", src);
-
-            // Blob also exists on the service.  Perform a server-side copy.
-            errno = 0;
-            azure_blob_client_wrapper->start_copy(str_options.containerName, srcPathString.substr(1), str_options.containerName, dstPathString.substr(1));
-            if (errno != 0)
-            {
-                int storage_errno = errno;
-                syslog(LOG_ERR, "Attempt to call start_copy from %s to %s failed.  errno = %d\n.", srcPathString.c_str()+1, dstPathString.c_str()+1, storage_errno);
-                return 0 - map_errno(storage_errno);
-            }
-            else
-            {
-                syslog(LOG_INFO, "Successfully called start_copy from blob %s to blob %s\n", srcPathString.c_str()+1, dstPathString.c_str()+1);
-            }
-
-            errno = 0;
-            do
-            {
-                blob_property = azure_blob_client_wrapper->get_blob_property(str_options.containerName, dstPathString.substr(1));
-            }
-            while(errno == 0 && blob_property.valid() && blob_property.copy_status.compare(0, 7, "pending") == 0);
-            if(blob_property.copy_status.compare(0, 7, "success") == 0)
-            {
-                syslog(LOG_INFO, "Copy operation from %s to %s succeeded.", srcPathString.c_str()+1, dstPathString.c_str()+1);
-
-                azure_blob_client_wrapper->delete_blob(str_options.containerName, srcPathString.substr(1));
-                if(errno != 0)
-                {
-                    int storage_errno = errno;
-                    syslog(LOG_ERR, "Failed to delete source blob %s during rename operation.  errno = %d\n.", srcPathString.c_str()+1, storage_errno);
-                    return 0 - map_errno(storage_errno);
-                }
-                else
-                {
-                    syslog(LOG_INFO, "Successfully deleted source blob %s during rename operation.\n", srcPathString.c_str()+1);
-                }
-            }
-            else
-            {
-                syslog(LOG_ERR, "Copy operation from %s to %s failed on the service.  Copy status = %s.\n", srcPathString.c_str()+1, dstPathString.c_str()+1, blob_property.copy_status.c_str());
-                return EFAULT;
-            }
-
-            // in the case of directory_rename, there may be local cache
-            // store the file in the cleanup list
-            g_gc_cache.add_file(dstPathString);
-
-            return 0;
-        }
-        else if (errno != 0)
-        {
-            int storage_errno = errno;
-            syslog(LOG_ERR, "Failed to get blob properties for blob %s during rename operation.  errno = %d\n", srcPathString.c_str()+1, storage_errno);
-            return 0 - map_errno(storage_errno);
-        }
-    }
 
     return 0;
 }

@@ -142,7 +142,9 @@ set (BLOBFUSE_HEADER
   blobfuse/blobfuse.h
   blobfuse/OAuthToken.h
   blobfuse/OAuthTokenCredentialManager.h
-)
+  blobfuse/include/StorageBfsClientBase.h
+  blobfuse/include/BlockBlobBfsClient.h
+        blobfuse/Constants.h blobfuse/include/file_lock_map.h blobfuse/include/gc_cache.h blobfuse/include/DataLakeBfsClient.h)
 
 set (BLOBFUSE_SOURCE
 #  blobfuse/blobfuse.cpp    # We don't include blobfuse.cpp because the file contents are directly #included in main.cpp.  This allows us to split main() and everything
@@ -153,7 +155,9 @@ set (BLOBFUSE_SOURCE
   blobfuse/utilities.cpp
   blobfuse/OAuthToken.cpp
   blobfuse/OAuthTokenCredentialManager.cpp
-)
+  blobfuse/src/StorageBfsClientBase.cpp
+  blobfuse/src/BlockBlobBfsClient.cpp
+        blobfuse/src/file_lock_map.cpp blobfuse/src/gc_cache.cpp blobfuse/src/DataLakeBfsClient.cpp)
 
 if(UNIX)
   project(blobfuse)
@@ -169,11 +173,11 @@ if(UNIX)
   add_definitions(-D_FILE_OFFSET_BITS=64)
   set(WARNING "-Wall -Wextra -Werror -pedantic -pedantic-errors")
   set(CMAKE_CXX_FLAGS "${CMAKE_THREAD_LIBS_INIT} ${WARNING} ${CMAKE_CXX_FLAGS}")
-  include_directories(${CMAKE_SOURCE_DIR}/blobfuse ${CMAKE_SOURCE_DIR}/azure-storage-cpp-lite/include ${CMAKE_SOURCE_DIR}/azure-storage-cpp-lite/adls/include ${CURL_INCLUDE_DIRS} ${GNUTLS_INCLUDE_DIR} ${Boost_INCLUDE_DIR} nlohmann-json)
+  include_directories(${CMAKE_SOURCE_DIR}/blobfuse ${CMAKE_SOURCE_DIR}/blobfuse/include ${CMAKE_SOURCE_DIR}/azure-storage-cpp-lite/include ${CMAKE_SOURCE_DIR}/azure-storage-cpp-lite/adls/include ${CURL_INCLUDE_DIRS} ${GNUTLS_INCLUDE_DIR} ${Boost_INCLUDE_DIR} nlohmann-json)
 
   set(CMAKE_MACOSX_RPATH ON)
 
-  add_executable(blobfuse ${BLOBFUSE_HEADER} ${BLOBFUSE_SOURCE} ${AZURE_STORAGE_HEADER} ${AZURE_STORAGE_SOURCE} blobfuse/main.cpp)
+  add_executable(blobfuse ${BLOBFUSE_HEADER} ${BLOBFUSE_SOURCE} ${AZURE_STORAGE_HEADER} ${AZURE_STORAGE_SOURCE} blobfuse/include/file_lock_map.h blobfuse/src/file_lock_map.cpp blobfuse/include/gc_cache.h blobfuse/src/gc_cache.cpp blobfuse/include/DataLakeBfsClient.h blobfuse/src/DataLakeBfsClient.cpp)
 
   pkg_search_module(UUID REQUIRED uuid)
   target_link_libraries(blobfuse ${CURL_LIBRARIES} ${GNUTLS_LIBRARIES} ${CMAKE_THREAD_LIBS_INIT} ${UUID_LIBRARIES} ${Boost_FILESYSTEM_LIBRARY} ${Boost_SYSTEM_LIBRARY} ${Boost_THREAD_LIBRARY} fuse gcrypt)

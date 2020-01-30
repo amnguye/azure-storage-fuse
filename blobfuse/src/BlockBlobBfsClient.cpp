@@ -1,0 +1,749 @@
+#include <sys/stat.h>
+#include "include/BlockBlobBfsClient.h"
+
+///<summary>
+/// Uploads contents of a file to a block blob to the Storage service
+///</summary>
+///TODO: params
+///<returns>none</returns>
+void BlockBlobBfsClient::UploadFromFile(std::string sourcePath)
+{
+    std::vector<std::pair<std::string, std::string>> metadata;
+    std::string blobName = sourcePath.substr(configurations.tmpPath.size() + 6 /* there are six characters in "/root/" */);
+
+    m_blob_client->upload_file_to_blob(sourcePath, containerName, blobName);
+
+    // upload_file_to_blob does not return a status or success if the blob succeeded
+    // it does syslog if there was an exception and changes the errno.
+}
+///<summary>
+/// Uploads contents of a stream to a block blob to the Storage service
+///</summary>
+///<returns>none</returns>
+void BlockBlobBfsClient::UploadFromStream(std::istream & sourceStream, std::string blobName)
+{
+    m_blob_client->upload_block_blob_from_stream(containerName, blobName, sourceStream);
+}
+///<summary>
+/// Downloads contents of a block blob to a local file
+///</summary>
+///<returns>none</returns>
+void BlockBlobBfsClient::DownloadToFile(std::string blobName, std::string filePath)
+{
+    time_t last_modified = {};
+    m_blob_client->download_blob_to_file(containerName, blobName, filePath, last_modified);
+}
+///<summary>
+/// Creates a Directory
+///</summary>
+///<returns>none</returns>
+bool BlockBlobBfsClient::CreateDirectory(const char * directoryPath)
+{
+    std::string directoryPathStr;
+    // There's no such thing as a "blob directory". We need to make a blob marker to represent that a directory exists
+    // The blob marker is an empty blob with the metadata containing "hdi_isfolder=true"
+    std::istringstream emptyDataStream("");
+    std::vector<std::pair<std::string, std::string>> metadata;
+    metadata.push_back(std::make_pair("hdi_isfolder", "true"));
+    errno = 0;
+
+    m_blob_client->upload_block_blob_from_stream(
+            containerName,
+            directoryPathStr.substr(1),
+            emptyDataStream,
+            metadata);
+
+    if (errno != 0)
+    {
+        int storage_errno = errno;
+        syslog(LOG_ERR,
+                "Failed to upload zero-length directory marker for path %s to blob %s.  errno = %d.\n",
+                directoryPath,
+                directoryPathStr.c_str()+1,
+                storage_errno);
+        return 0 - map_errno(errno);
+    }
+    else
+    {
+        syslog(LOG_INFO,
+                "Successfully uploaded zero-length directory marker for path %s to blob %s. ",
+                directoryPath,
+                directoryPathStr.c_str()+1);
+    }
+    return true;
+}
+///<summary>
+/// Deletes a Directory
+///</summary>
+///<returns>none</returns>
+bool BlockBlobBfsClient::DeleteDirectory(const char * directoryPath)
+{
+    // There's no such thing as a "blob directory". When a directory is created through blobfuse or another process
+    // it makes an empty blob marker that represents a directory through a empty blob marker and metadata set to
+    // "hdi_isfolder"
+
+    errno = 0;
+    Constants::D_RETURN_CODE dir_blob_exists = IsDirectoryEmpty(directoryPath);
+
+    if (errno != 0)
+    {
+        if ((errno != 404) && (errno != ENOENT))
+        {
+            return false; // Failure in fetching properties - errno set by blob_exists
+        }
+        switch(dir_blob_exists)
+        {
+            case Constants::D_NOTEXIST:
+                //log that the directory does not exist
+                return false;
+                break;
+            case Constants::D_EMPTY:
+                DeleteFile((std::string)directoryPath);
+                return true;
+            case Constants::D_NOTEMPTY:
+                return false;
+            default:
+                // Unforseen error,syslog and return false
+                break;
+        }
+    }
+    return false;
+}
+///<summary>
+/// Deletes a File
+///</summary>
+///<returns>none</returns>
+void BlockBlobBfsClient::DeleteFile(std::string pathToDelete)
+{
+    m_blob_client->delete_blob(containerName, pathToDelete);
+}
+///<summary>
+/// Gets the properties of a path
+///</summary>
+///<returns>BfsFileProperty object which contains the property details of the file</returns>
+BfsFileProperty BlockBlobBfsClient::GetProperties(std::string pathName)
+{
+    blob_property property = m_blob_client->get_blob_property(containerName, pathName);
+
+    BfsFileProperty ret_property(property.cache_control,
+            property.content_disposition,
+            property.content_encoding,
+            property.content_language,
+            property.content_md5,
+            property.content_type,
+            property.etag,
+            property.copy_status,
+            property.metadata,
+            property.last_modified,
+            property.size);
+    return ret_property;
+}
+///<summary>
+/// Determines whether or not a path (file or directory) exists or not
+///</summary>
+///<returns>none</returns>
+int BlockBlobBfsClient::Exists(std::string pathName)
+{
+    errno = 0;
+    blob_property property = m_blob_client->get_blob_property(containerName, pathName);
+
+    if(errno != 0)
+    {
+        if(errno != 404 && (errno != ENOENT))
+        {
+            //failed to fetch properties
+            return 0 - map_errno(errno);
+        }
+        // does not exist
+        return 1;
+    }
+    //return 0 for success
+    return 0;
+}
+///<summary>
+/// Determines whether or not a path (file or directory) exists or not
+///</summary>
+///<returns>none</returns>
+bool BlockBlobBfsClient::Copy(std::string sourcePath, std::string destinationPath)
+{
+    m_blob_client->start_copy(containerName, sourcePath, containerName, destinationPath);
+    return true;
+}
+///<summary>
+/// Renames a file
+///</summary>
+///<returns>none</returns>
+std::vector<std::string> BlockBlobBfsClient::Rename(std::string sourcePath, std::string destinationPath)
+{
+    std::string srcPathStr(sourcePath);
+    std::string dstPathStr(destinationPath);
+
+    std::vector<std::string> files_to_remove;
+    // Rename the directory blob, if it exists.
+    errno = 0;
+    if (Exists(srcPathStr))
+    {
+        rename_single_file(sourcePath.c_str(), destinationPath.c_str(), files_to_remove);
+    }
+    if (errno != 0)
+    {
+        if ((errno != 404) && (errno != ENOENT))
+        {
+            return files_to_remove; // Failure in fetching properties - errno set by blob_exists
+        }
+    }
+
+    if (srcPathStr.size() > 1)
+    {
+        srcPathStr.push_back('/');
+    }
+    if (dstPathStr.size() > 1)
+    {
+        dstPathStr.push_back('/');
+    }
+    std::vector<std::string> local_list_results;
+
+    // Rename all files and directories that exist in the local cache.
+    ensure_directory_path_exists_cache(prepend_mnt_path_string(dstPathStr + "placeholder"));
+    std::string mntPathString = prepend_mnt_path_string(srcPathStr);
+    DIR *dir_stream = opendir(mntPathString.c_str());
+    if (dir_stream != NULL)
+    {
+        struct dirent *dir_ent = readdir(dir_stream);
+        while (dir_ent != NULL)
+        {
+            if (dir_ent->d_name[0] != '.')
+            {
+                int nameLen = strlen(dir_ent->d_name);
+                char *newSrc = (char *) malloc(sizeof(char) * (srcPathStr.size() + nameLen + 1));
+                memcpy(newSrc, srcPathStr.c_str(), srcPathStr.size());
+                memcpy(&(newSrc[srcPathStr.size()]), dir_ent->d_name, nameLen);
+                newSrc[srcPathStr.size() + nameLen] = '\0';
+
+                char *newDst = (char *) malloc(sizeof(char) * (dstPathStr.size() + nameLen + 1));
+                memcpy(newDst, dstPathStr.c_str(), dstPathStr.size());
+                memcpy(&(newDst[dstPathStr.size()]), dir_ent->d_name, nameLen);
+                newDst[dstPathStr.size() + nameLen] = '\0';
+
+                AZS_DEBUGLOGV("Local object found - about to rename %s to %s.\n", newSrc, newDst);
+                if (dir_ent->d_type == DT_DIR) {
+                    rename_directory(newSrc, newDst, files_to_remove);
+                } else {
+                    rename_single_file(newSrc, newDst, files_to_remove);
+                }
+
+                free(newSrc);
+                free(newDst);
+
+                std::string dir_str(dir_ent->d_name);
+                local_list_results.push_back(dir_str);
+            }
+
+            dir_ent = readdir(dir_stream);
+        }
+
+        closedir(dir_stream);
+    }
+    return files_to_remove;
+}
+///<summary>
+/// Lists
+///</summary>
+///<returns>none</returns>
+list_hierarchical_response
+BlockBlobBfsClient::List(std::string delimiter, std::string continuation, std::string prefix) const
+{
+
+    //TODO: MAKE THIS BETTER
+    list_blobs_hierarchical_response listed_blob_response = m_blob_client->list_blobs_hierarchical(
+            containerName,
+            delimiter,
+            continuation,
+            prefix);
+    return list_hierarchical_response(listed_blob_response);
+}
+
+
+///<summary>
+/// Checks if the blob is a directory
+///</summary>
+///<returns>none</returns>
+bool BlockBlobBfsClient::IsDirectory(const char * path)
+{
+    blob_property props = m_blob_client->get_blob_property(containerName, path);
+
+    if(props.valid()) {
+        if (props.size == 0) {
+            for (auto iter = props.metadata.begin(); iter != props.metadata.end(); ++iter) {
+                if ((iter->first.compare("hdi_isfolder") == 0) && (iter->second.compare("true") == 0)) {
+                    return true;
+                }
+            }
+        } else{
+            //TODO: throw exception
+            //TODO: log error
+        }
+    } else{
+        //TODO: throw exception
+        //TODO: log error
+    }
+    return false;
+}
+/*
+ * Check if the directory is empty or not by checking if there is any blob with prefix exists in the specified container.
+ *
+ * return
+ *   - D_NOTEXIST if there's nothing there (the directory does not exist)
+ *   - D_EMPTY is there's exactly one blob, and it's the ".directory" blob
+ *   - D_NOTEMPTY otherwise (the directory exists and is not empty.)
+ */
+Constants::D_RETURN_CODE BlockBlobBfsClient::IsDirectoryEmpty(const char *path)
+{
+    std::string delimiter = "/";
+    std::string prefix_with_slash = path;
+    prefix_with_slash.append(delimiter);
+    std::string continuation;
+    bool success = false;
+    int failcount = 0;
+    bool old_dir_blob_found = false;
+    do
+    {
+        errno = 0;
+        list_blobs_hierarchical_response response = m_blob_client->list_blobs_hierarchical(containerName, delimiter, continuation, prefix_with_slash, 2);
+        if (errno == 0)
+        {
+            success = true;
+            failcount = 0;
+            continuation = response.next_marker;
+            if (response.blobs.size() > 1)
+            {
+                return Constants::D_NOTEMPTY;
+            }
+            if (response.blobs.size() > 0)
+            {
+                if ((!old_dir_blob_found) &&
+                    (!response.blobs[0].is_directory) &&
+                    (response.blobs[0].name.size() > Constants::former_directory_signifier.size()) &&
+                    (0 == response.blobs[0].name.compare(response.blobs[0].name.size() - Constants::former_directory_signifier.size(), Constants::former_directory_signifier.size(), Constants::former_directory_signifier)))
+                {
+                    old_dir_blob_found = true;
+                }
+                else
+                {
+                    return Constants::D_NOTEMPTY;
+                }
+            }
+        }
+        else
+        {
+            success = false;
+            failcount++; //TODO: use to set errno.
+        }
+    } while ((continuation.size() > 0 || !success) && failcount < 20);
+
+    if (!success)
+    {
+        // errno will be set by list_blobs_hierarchial if the last call failed and we're out of retries.
+        return Constants::D_FAILED;
+    }
+
+    return old_dir_blob_found ? Constants::D_EMPTY : Constants::D_NOTEMPTY;
+}
+
+int BlockBlobBfsClient::rename_single_file(const char * src, const char * dst, std::vector<std::string> & files_to_remove_cache)
+{
+    // TODO: if src == dst, return?
+    // TODO: lock in alphabetical order?
+    auto fsrcmutex = file_lock_map::get_instance()->get_mutex(src);
+    std::lock_guard<std::mutex> locksrc(*fsrcmutex);
+
+    auto fdstmutex = file_lock_map::get_instance()->get_mutex(dst);
+    std::lock_guard<std::mutex> lockdst(*fdstmutex);
+
+    std::string srcPathString(src);
+    const char * srcMntPath;
+    std::string srcMntPathString = prepend_mnt_path_string(srcPathString);
+    srcMntPath = srcMntPathString.c_str();
+
+    std::string dstPathString(dst);
+    const char * dstMntPath;
+    std::string dstMntPathString = prepend_mnt_path_string(dstPathString);
+    dstMntPath = dstMntPathString.c_str();
+
+    struct stat buf;
+    int statret = stat(srcMntPath, &buf);
+    if (statret == 0)
+    {
+        AZS_DEBUGLOGV("Source file %s in rename operation exists in the local cache.\n", src);
+
+        // The file exists in the local cache.  Call rename() on it (note this will preserve existing handles.)
+        ensure_directory_path_exists_cache(dstMntPath);
+        errno = 0;
+        int renameret = rename(srcMntPath, dstMntPath);
+        if (renameret < 0)
+        {
+            syslog(LOG_ERR, "Failure to rename source file %s in the local cache.  Errno = %d.\n", src, errno);
+            return -errno;
+        }
+        else
+        {
+            AZS_DEBUGLOGV("Successfully to renamed file %s to %s in the local cache.\n", src, dst);
+        }
+        errno = 0;
+        auto blob_property = GetProperties(srcPathString.substr(1));
+        if ((errno == 0) && blob_property.isValid())
+        {
+            AZS_DEBUGLOGV("Source file %s for rename operation exists as a blob on the service.\n", src);
+            // Blob also exists on the service.  Perform a server-side copy.
+            errno = 0;
+            Copy(srcPathString.substr(1), dstPathString.substr(1));
+            if (errno != 0)
+            {
+                int storage_errno = errno;
+                syslog(LOG_ERR, "Attempt to call start_copy from %s to %s failed.  errno = %d\n.", srcPathString.c_str()+1, dstPathString.c_str()+1, storage_errno);
+                return 0 - map_errno(errno);
+            }
+            else
+            {
+                syslog(LOG_INFO, "Successfully called start_copy from blob %s to blob %s\n", srcPathString.c_str()+1, dstPathString.c_str()+1);
+            }
+
+            errno = 0;
+            do
+            {
+                blob_property = GetProperties(dstPathString.substr(1));
+            }
+            while(errno == 0 && blob_property.isValid() && blob_property.m_copy_status.compare(0, 7, "pending") == 0);
+            if(blob_property.m_copy_status.compare(0, 7, "success") == 0)
+            {
+                syslog(LOG_INFO, "Copy operation from %s to %s succeeded.", srcPathString.c_str()+1, dstPathString.c_str()+1);
+
+//                int retval = azs_unlink(srcPathString); // This will remove the blob from the service, and also take care of removing the directory in the local file cache.
+                DeleteFile(srcPathString.substr(1));
+                if(errno != 0)
+                {
+                    int storage_errno = errno;
+                    syslog(LOG_ERR, "Failed to delete source blob %s during rename operation.  errno = %d\n.", srcPathString.c_str()+1, storage_errno);
+                    return 0 - map_errno(storage_errno);
+                }
+                else
+                {
+                    syslog(LOG_INFO, "Successfully deleted source blob %s during rename operation.\n", srcPathString.c_str()+1);
+                }
+            }
+            else
+            {
+                syslog(LOG_ERR, "Copy operation from %s to %s failed on the service.  Copy status = %s.\n", srcPathString.c_str()+1, dstPathString.c_str()+1, blob_property.m_copy_status.c_str());
+                return EFAULT;
+            }
+
+            // store the file in the cleanup list
+            files_to_remove_cache.push_back(dstPathString);
+
+            return 0;
+        }
+        else if (errno != 0)
+        {
+            int storage_errno = errno;
+            syslog(LOG_ERR, "Failed to get blob properties for blob %s during rename operation.  errno = %d\n", srcPathString.c_str()+1, storage_errno);
+            return 0 - map_errno(storage_errno);
+        }
+    }
+    else
+    {
+        AZS_DEBUGLOGV("Source file %s in rename operation does not exist in the local cache.\n", src);
+
+        // File does not exist locally.  Just do the blob copy.
+        // TODO: remove duplicated code.
+        errno = 0;
+        auto blob_property = GetProperties(srcPathString.substr(1));
+        if ((errno == 0) && blob_property.isValid())
+        {
+            AZS_DEBUGLOGV("Source file %s for rename operation exists as a blob on the service.\n", src);
+
+            // Blob also exists on the service.  Perform a server-side copy.
+            errno = 0;
+            Copy(srcPathString.substr(1), dstPathString.substr(1));
+            if (errno != 0)
+            {
+                int storage_errno = errno;
+                syslog(LOG_ERR, "Attempt to call start_copy from %s to %s failed.  errno = %d\n.", srcPathString.c_str()+1, dstPathString.c_str()+1, storage_errno);
+                return 0 - map_errno(storage_errno);
+            }
+            else
+            {
+                syslog(LOG_INFO, "Successfully called start_copy from blob %s to blob %s\n", srcPathString.c_str()+1, dstPathString.c_str()+1);
+            }
+
+            errno = 0;
+            do
+            {
+                blob_property = GetProperties(dstPathString.substr(1));
+            }
+            while(errno == 0 && blob_property.isValid() && blob_property.m_copy_status.compare(0, 7, "pending") == 0);
+            if(blob_property.m_copy_status.compare(0, 7, "success") == 0)
+            {
+                syslog(LOG_INFO, "Copy operation from %s to %s succeeded.", srcPathString.c_str()+1, dstPathString.c_str()+1);
+
+                DeleteFile(srcPathString.substr(1));
+                if(errno != 0)
+                {
+                    int storage_errno = errno;
+                    syslog(LOG_ERR, "Failed to delete source blob %s during rename operation.  errno = %d\n.", srcPathString.c_str()+1, storage_errno);
+                    return 0 - map_errno(storage_errno);
+                }
+                else
+                {
+                    syslog(LOG_INFO, "Successfully deleted source blob %s during rename operation.\n", srcPathString.c_str()+1);
+                }
+            }
+            else
+            {
+                syslog(LOG_ERR, "Copy operation from %s to %s failed on the service.  Copy status = %s.\n", srcPathString.c_str()+1, dstPathString.c_str()+1, blob_property.m_copy_status.c_str());
+                return EFAULT;
+            }
+
+            // in the case of directory_rename, there may be local cache
+            // store the file in the cleanup list
+            files_to_remove_cache.push_back(dstPathString);
+
+            return 0;
+        }
+        else if (errno != 0)
+        {
+            int storage_errno = errno;
+            syslog(LOG_ERR, "Failed to get blob properties for blob %s during rename operation.  errno = %d\n", srcPathString.c_str()+1, storage_errno);
+            return 0 - map_errno(storage_errno);
+        }
+    }
+    return 0;
+}
+
+int BlockBlobBfsClient::rename_directory(const char * src, const char * dst, std::vector<std::string> & files_to_remove_cache)
+{
+    AZS_DEBUGLOGV("azs_rename_directory called with src = %s, dst = %s.\n", src, dst);
+    std::string srcPathStr(src);
+    std::string dstPathStr(dst);
+
+    // Rename the directory blob, if it exists.
+    errno = 0;
+    if (Exists(srcPathStr))
+    {
+        rename_single_file(src, dst, files_to_remove_cache);
+    }
+    if (errno != 0)
+    {
+        if ((errno != 404) && (errno != ENOENT))
+        {
+            return 0 - map_errno(errno); // Failure in fetching properties - errno set by blob_exists
+        }
+    }
+
+    if (srcPathStr.size() > 1)
+    {
+        srcPathStr.push_back('/');
+    }
+    if (dstPathStr.size() > 1)
+    {
+        dstPathStr.push_back('/');
+    }
+    std::vector<std::string> local_list_results;
+
+    // Rename all files and directories that exist in the local cache.
+    ensure_directory_path_exists_cache(prepend_mnt_path_string(dstPathStr + "placeholder"));
+    std::string mntPathString = prepend_mnt_path_string(srcPathStr);
+    DIR *dir_stream = opendir(mntPathString.c_str());
+    if (dir_stream != NULL)
+    {
+        struct dirent* dir_ent = readdir(dir_stream);
+        while (dir_ent != NULL)
+        {
+            if (dir_ent->d_name[0] != '.')
+            {
+                int nameLen = strlen(dir_ent->d_name);
+                char *newSrc = (char *)malloc(sizeof(char) * (srcPathStr.size() + nameLen + 1));
+                memcpy(newSrc, srcPathStr.c_str(), srcPathStr.size());
+                memcpy(&(newSrc[srcPathStr.size()]), dir_ent->d_name, nameLen);
+                newSrc[srcPathStr.size() + nameLen] = '\0';
+
+                char *newDst = (char *)malloc(sizeof(char) * (dstPathStr.size() + nameLen + 1));
+                memcpy(newDst, dstPathStr.c_str(), dstPathStr.size());
+                memcpy(&(newDst[dstPathStr.size()]), dir_ent->d_name, nameLen);
+                newDst[dstPathStr.size() + nameLen] = '\0';
+
+                AZS_DEBUGLOGV("Local object found - about to rename %s to %s.\n", newSrc, newDst);
+                if (dir_ent->d_type == DT_DIR)
+                {
+                    rename_directory(newSrc, newDst, files_to_remove_cache);
+                }
+                else
+                {
+                    rename_single_file(newSrc, newDst, files_to_remove_cache);
+                }
+
+                free(newSrc);
+                free(newDst);
+
+                std::string dir_str(dir_ent->d_name);
+                local_list_results.push_back(dir_str);
+            }
+
+            dir_ent = readdir(dir_stream);
+        }
+
+        closedir(dir_stream);
+    }
+
+    // Rename all files & directories that don't exist in the local cache.
+    errno = 0;
+    std::vector<std::pair<std::vector<list_hierarchical_item>, bool>> listResults = ListAllItemsHierarchical("/",
+                                                                                                             srcPathStr.substr(
+                                                                                                                     1));
+    if (errno != 0)
+    {
+        int storage_errno = errno;
+        syslog(LOG_ERR, "list blobs operation failed during attempt to rename directory %s to %s.  errno = %d.\n", src, dst, storage_errno);
+        return 0 - map_errno(storage_errno);
+    }
+    AZS_DEBUGLOGV("Total of %d result lists found from list_blobs call during rename operation\n.", (int)listResults.size());
+    for (size_t result_lists_index = 0; result_lists_index < listResults.size(); result_lists_index++)
+    {
+        int start = listResults[result_lists_index].second ? 1 : 0;
+        for (size_t i = start; i < listResults[result_lists_index].first.size(); i++)
+        {
+            // We need to parse out just the trailing part of the path name.
+            int len = listResults[result_lists_index].first[i].name.size();
+            if (len > 0)
+            {
+                std::string prev_token_str;
+                if (listResults[result_lists_index].first[i].name.back() == '/')
+                {
+                    prev_token_str = listResults[result_lists_index].first[i].name.substr(srcPathStr.size() - 1, listResults[result_lists_index].first[i].name.size() - srcPathStr.size());
+                }
+                else
+                {
+                    prev_token_str = listResults[result_lists_index].first[i].name.substr(srcPathStr.size() - 1);
+                }
+
+                // TODO: order or hash the list to improve perf
+                if ((prev_token_str.size() > 0) && (std::find(local_list_results.begin(), local_list_results.end(), prev_token_str) == local_list_results.end()))
+                {
+                    int nameLen = prev_token_str.size();
+                    char *newSrc = (char *)malloc(sizeof(char) * (srcPathStr.size() + nameLen + 1));
+                    memcpy(newSrc, srcPathStr.c_str(), srcPathStr.size());
+                    memcpy(&(newSrc[srcPathStr.size()]), prev_token_str.c_str(), nameLen);
+                    newSrc[srcPathStr.size() + nameLen] = '\0';
+
+                    char *newDst = (char *)malloc(sizeof(char) * (dstPathStr.size() + nameLen + 1));
+                    memcpy(newDst, dstPathStr.c_str(), dstPathStr.size());
+                    memcpy(&(newDst[dstPathStr.size()]), prev_token_str.c_str(), nameLen);
+                    newDst[dstPathStr.size() + nameLen] = '\0';
+
+                    AZS_DEBUGLOGV("Object found on the service - about to rename %s to %s.\n", newSrc, newDst);
+                    if (listResults[result_lists_index].first[i].is_directory)
+                    {
+                        rename_directory(newSrc, newDst, files_to_remove_cache);
+                    }
+                    else
+                    {
+                        rename_single_file(newSrc, newDst, files_to_remove_cache);
+                    }
+
+                    free(newSrc);
+                    free(newDst);
+                }
+            }
+        }
+    }
+    DeleteDirectory(src);
+    return 0;
+}
+
+int BlockBlobBfsClient::ensure_directory_path_exists_cache(const std::string & file_path)
+{
+    char *pp;
+    char *slash;
+    int status;
+    char *copypath = strdup(file_path.c_str());
+
+    status = 0;
+    errno = 0;
+    pp = copypath;
+    while (status == 0 && (slash = strchr(pp, '/')) != 0)
+    {
+        if (slash != pp)
+        {
+            *slash = '\0';
+            AZS_DEBUGLOGV("Making cache directory %s.\n", copypath);
+            struct stat st;
+            if (stat(copypath, &st) != 0)
+            {
+                status = mkdir(copypath, configurations.default_permission);
+            }
+
+            // Ignore if some other thread was successful creating the path
+            if(errno == EEXIST)
+            {
+                status = 0;
+                errno = 0;
+            }
+
+            *slash = '/';
+        }
+        pp = slash + 1;
+    }
+    free(copypath);
+    return status;
+}
+
+std::vector<std::pair<std::vector<list_hierarchical_item>, bool>> BlockBlobBfsClient::ListAllItemsHierarchical(
+        const std::string& delimiter,
+        const std::string& prefix)
+{
+    static const int maxFailCount = 20;
+    std::vector<std::pair<std::vector<list_hierarchical_item>, bool>>  results;
+
+    std::string continuation;
+
+    std::string prior;
+    bool success = false;
+    int failcount = 0;
+    do
+    {
+        AZS_DEBUGLOGV("About to call list_blobs_hierarchial.  Container = %s, delimiter = %s, continuation = %s, prefix = %s\n",
+                containerName.c_str(),
+                delimiter.c_str(),
+                continuation.c_str(),
+                prefix.c_str());
+
+        errno = 0;
+        list_hierarchical_response response = List(delimiter, continuation, prefix);
+        if (errno == 0)
+        {
+            success = true;
+            failcount = 0;
+            AZS_DEBUGLOGV("Successful call to list_blobs_hierarchical.  results count = %d, next_marker = %s.\n", (int)response.m_items.size(), response.m_next_marker.c_str());
+            continuation = response.m_next_marker;
+            if(response.m_items.size() > 0)
+            {
+                bool skip_first = false;
+                if(response.m_items[0].name == prior)
+                {
+                    skip_first = true;
+                }
+                prior = response.m_items.back().name;
+                results.push_back(std::make_pair(std::move(response.m_items), skip_first));
+            }
+        }
+        else
+        {
+            failcount++;
+            success = false;
+            syslog(LOG_WARNING, "list_blobs_hierarchical failed for the %d time with errno = %d.\n", failcount, errno);
+
+        }
+    } while (((continuation.size() > 0) || !success) && (failcount < maxFailCount));
+
+    // errno will be set by list_blobs_hierarchial if the last call failed and we're out of retries.
+    return results;
+}

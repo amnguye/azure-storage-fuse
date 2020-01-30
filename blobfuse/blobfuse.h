@@ -13,14 +13,14 @@
 #include <iostream>
 #include <sstream>
 #include <fstream>
-#include <map>
 #include <memory>
-#include <dirent.h>
 #include <deque>
 #include <gnutls/gnutls.h>
 #include <gcrypt.h>
 #include <pthread.h>
 #include <syslog.h>
+#include "gc_cache.h"
+#include "BlockBlobBfsClient.h"
 
 // Declare that we're using version 2.9 of FUSE
 // 3.0 is not built-in to many distros yet.
@@ -35,74 +35,10 @@
 
 #define UNREFERENCED_PARAMETER(p) (p)
 
-/* Define high and low gc_cache threshold values*/
-/* These threshold values were not calculated and are just an approximation of when we should be clearing the cache */
-#define HIGH_THRESHOLD_VALUE 90
-#define LOW_THRESHOLD_VALUE 80
-
-/* Define errors and return codes */
-#define D_NOTEXIST -1
-#define D_EMPTY 0
-#define D_NOTEMPTY 1
-
-#define AZS_DEBUGLOGV(fmt,...) do {syslog(LOG_DEBUG,"Function %s, in file %s, line %d: " fmt, __func__, __FILE__, __LINE__, __VA_ARGS__); } while(0)
-#define AZS_DEBUGLOG(fmt) do {syslog(LOG_DEBUG,"Function %s, in file %s, line %d: " fmt, __func__, __FILE__, __LINE__); } while(0)
-
 // instruct gcrypt to use pthread
 GCRY_THREAD_OPTION_PTHREAD_IMPL;
 
 using namespace microsoft_azure::storage;
-
-// We use two different locking schemes to protect files / blobs against data corruption and data loss scenarios.
-// The first is an in-memory std::mutex, the second is flock (Linux).  Each file path gets its own mutex and flock lock.
-// The in-memory mutex should only be held while control is in a method that is directly communicating with Azure Storage.
-// The flock lock should be held continuously, from the time that the file is opened until the time that the file is closed.  It should also be held during blob download and upload.
-// Blob download should hold the flock lock in exclusive mode.  Read/write operations should hold it in shared mode.
-// Explanations for why we lock in various places are in-line.
-
-// This class contains mutexes that we use to lock file paths during blob upload / download / delete.
-// Each blob / file path gets its own mutex.
-// This mutex should never be held when control is not in an open(), flush(), or unlink() method.
-class file_lock_map
-{
-public:
-    static file_lock_map* get_instance();
-    std::shared_ptr<std::mutex> get_mutex(const std::string& path);
-
-private:
-    file_lock_map()
-    {
-    }
-
-    static std::shared_ptr<file_lock_map> s_instance;
-    static std::mutex s_mutex;
-    std::mutex m_mutex;
-    std::map<std::string, std::shared_ptr<std::mutex>> m_lock_map;
-};
-
-// deque to age cached files based on timeout
-struct file_to_delete
-{
-    std::string path;
-    time_t closed_time;    
-};
-
-class gc_cache
-{
-    public:
-        gc_cache() : disk_threshold_reached(false){}
-        void run();
-        void add_file(std::string path);
-
-    private:
-        bool disk_threshold_reached;
-        const double high_threshold = HIGH_THRESHOLD_VALUE;
-        const double low_threshold = LOW_THRESHOLD_VALUE;
-        std::deque<file_to_delete> m_cleanup;
-        std::mutex m_deque_lock;
-        void run_gc_cache();
-        bool check_disk_space();
-};
 
 extern gc_cache g_gc_cache;
 
@@ -118,42 +54,16 @@ struct fhwrapper
     }
 };
 
-
-// Global struct storing the Storage connection information and the tmpPath.
-struct str_options
-{
-    std::string accountName;
-    std::string authType;
-    std::string blobEndpoint;
-    std::string accountKey;
-    std::string sasToken;
-    std::string clientId;
-    std::string objectId;
-    std::string resourceId;
-    std::string msiEndpoint;
-    std::string containerName;
-    std::string tmpPath;
-    bool use_https;
-    bool use_attr_cache;
-};
-
 extern struct str_options str_options;
 
 extern int file_cache_timeout_in_seconds;
 
-extern int default_permission;
-
 // This is used to make all the calls to Storage
 // The C++ lite client does not store state, other than connection info, so we can use it between calls without issue.
-extern std::shared_ptr<sync_blob_client> azure_blob_client_wrapper;
+extern std::shared_ptr<StorageBfsClientBase> storage_client;
 
 // Used to map HTTP errors (ex. 404) to Linux errno (ex ENOENT)
 extern std::map<int, int> error_mapping;
-
-// Needed for compatibility with pre-GA blobfuse:
-// String that signifies that this blob represents a directory.
-// This string should be appended to the name of the directory.  The resultant string should be the name of a zero-length blob; this represents the directory on the service.
-extern const std::string former_directory_signifier;
 
 // Helper function to map an HTTP error to an errno.
 // Should be called on any errno returned from the Azure Storage cpp lite lib.
@@ -180,15 +90,6 @@ int shared_lock_file(int flags, int fd);
 
 // Helper function to create all directories in the path if they don't already exist.
 int ensure_files_directory_exists_in_cache(const std::string& file_path);
-
-// Greedily list all blobs using the input params.
-std::vector<std::pair<std::vector<list_blobs_hierarchical_item>, bool>> list_all_blobs_hierarchical(const std::string& container, const std::string& delimiter, const std::string& prefix);
-
-// Returns:
-// 0 if there's nothing there (the directory does not exist)
-// 1 If there's either the ".directory" blob, or the hdfs-type directory blob
-// 2 otherwise (the directory exists and is not empty.)
-int is_directory_empty(const std::string& container, const std::string& dir_name);
 
 // Returns true if the input has zero length and the "hdi_isfolder=true" metadata.
 bool is_directory_blob(unsigned long long size, std::vector<std::pair<std::string, std::string>> metadata);

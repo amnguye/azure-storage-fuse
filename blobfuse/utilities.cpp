@@ -1,8 +1,6 @@
 #include "blobfuse.h"
 #include <sys/file.h>
 
-gc_cache g_gc_cache;
-
 int map_errno(int error)
 {
     auto mapping = error_mapping.find(error);
@@ -22,159 +20,6 @@ std::string prepend_mnt_path_string(const std::string& path)
     std::string result;
     result.reserve(str_options.tmpPath.length() + 5 + path.length());
     return result.append(str_options.tmpPath).append("/root").append(path);
-}
-
-//Helper function to help calculate the disk space we have left for the cache location
-//params: none
-//return: Returns true if we've reached the threshold, false otherwise
-bool gc_cache::check_disk_space()
-{
-    struct statvfs buf;
-    if(statvfs(str_options.tmpPath.c_str(), &buf) != 0)
-    {
-        return false;
-    }
-
-    //calculating the percentage of the amount of used space on the cached disk
-    //<used space in bytes> = <total size of disk in bytes> - <size of available disk space in bytes>
-    //<used percent of cached disk >= <used space> / <total size>
-    //f_frsize - the fundamental file system block size (in bytes) (used to convert file system blocks to bytes)
-    //f_blocks - total number of blocks on the filesystem/disk in the units of f_frsize
-    //f_bfree - total number of free blocks in units of f_frsize
-    double total = buf.f_blocks * buf.f_frsize;
-    double available = buf.f_bfree * buf.f_frsize;
-    double used = total - available;
-    double used_percent = (double)(used / total) * (double)100;
-
-    if(used_percent >= high_threshold && !disk_threshold_reached)
-    {
-        return true;
-    }
-    else if(used_percent >= low_threshold && disk_threshold_reached)
-    {
-        return true;
-    }
-    return false;
-}
-
-void gc_cache::add_file(std::string path)
-{
-    file_to_delete file;
-    file.path = path;
-    file.closed_time = time(NULL); 
-    
-    // lock before updating deque
-    std::lock_guard<std::mutex> lock(m_deque_lock);
-    m_cleanup.push_back(file);
-}
-
-void gc_cache::run()
-{
-    std::thread t1(std::bind(&gc_cache::run_gc_cache,this));
-    t1.detach();
-}
-
-// cleanup function to clean cached files that are too old
-void gc_cache::run_gc_cache()
-{
-
-    while(true){
-
-        // lock the deque
-        file_to_delete file;
-        bool is_empty;
-        {
-            std::lock_guard<std::mutex> lock(m_deque_lock);
-            is_empty = m_cleanup.empty();
-            if(!is_empty)
-            {
-                file = m_cleanup.front();
-            }
-        }
-
-        //if deque is empty, skip
-        if(is_empty)
-        {
-            //run it every 1 second
-            usleep(1000);
-            continue;
-        }
-
-        time_t now = time(NULL);
-        //check if the closed time is old enough to delete
-        if(((now - file.closed_time) > file_cache_timeout_in_seconds) || disk_threshold_reached)
-        {
-            AZS_DEBUGLOGV("File %s being considered for deletion by file cache GC.\n", file.path.c_str());
-
-            // path in the temp location
-            const char * mntPath;
-            std::string mntPathString = prepend_mnt_path_string(file.path);
-            mntPath = mntPathString.c_str();
-
-            //check if the file on disk is still too old
-            //mutex lock
-            auto fmutex = file_lock_map::get_instance()->get_mutex(file.path.c_str());
-            std::lock_guard<std::mutex> lock(*fmutex);
-
-            struct stat buf;
-            stat(mntPath, &buf);
-            if ((((now - buf.st_mtime) > file_cache_timeout_in_seconds) && ((now - buf.st_ctime) > file_cache_timeout_in_seconds))
-                || disk_threshold_reached)
-            {
-                //clean up the file from cache
-                int fd = open(mntPath, O_WRONLY);
-                if (fd > 0)
-                {
-                    int flockres = flock(fd, LOCK_EX|LOCK_NB);
-                    if (flockres != 0)
-                    {
-                        if (errno == EWOULDBLOCK)
-                        {
-                            // Someone else holds the lock.  In this case, we will postpone updating the cache until the next time open() is called.
-                            // TODO: examine the possibility that we can never acquire the lock and refresh the cache.
-                            AZS_DEBUGLOGV("Did not clean up file %s from file cache because there's still an open file handle to it.", mntPath);
-                        }
-                        else
-                        {
-                            // Failed to acquire the lock for some other reason.  We close the open fd, and continue.
-                            syslog(LOG_ERR, "Did not clean up file %s from file cache because we failed to acquire the flock for an unknown reason, errno = %d.\n", mntPath, errno);
-                        }
-                    }
-                    else
-                    {
-                        unlink(mntPath);
-                        flock(fd, LOCK_UN);
-
-                        //update disk space
-                        disk_threshold_reached = check_disk_space();
-                    }
-
-                    close(fd);
-                }
-                else
-                {
-                    //TODO:if we can't open the file consistently, should we just try to move onto the next file?
-                    //or somehow timeout on a file we can't open?
-                    AZS_DEBUGLOGV("Failed to open file %s from file cache in GC, skipping cleanup. errno from open = %d.", mntPath, errno);
-                }
-            }
-
-            // lock to remove from front
-            {
-                std::lock_guard<std::mutex> lock(m_deque_lock);
-                m_cleanup.pop_front();
-            }
-
-        }
-        else
-        {
-            // no file was timed out - let's wait a second
-            usleep(1000);
-            //check disk space
-            disk_threshold_reached = check_disk_space();
-        }
-    }
-
 }
 
 // Acquire shared lock utility function
@@ -245,7 +90,7 @@ int ensure_files_directory_exists_in_cache(const std::string& file_path)
             struct stat st;
             if (stat(copypath, &st) != 0)
             {
-                status = mkdir(copypath, default_permission);
+                status = mkdir(copypath, str_options.default_permission);
             }
 
             // Ignore if some other thread was successful creating the path
@@ -263,136 +108,13 @@ int ensure_files_directory_exists_in_cache(const std::string& file_path)
     return status;
 }
 
-std::vector<std::pair<std::vector<list_blobs_hierarchical_item>, bool>> list_all_blobs_hierarchical(const std::string& container, const std::string& delimiter, const std::string& prefix)
-{
-    static const int maxFailCount = 20;
-    std::vector<std::pair<std::vector<list_blobs_hierarchical_item>, bool>>  results;
-
-    std::string continuation;
-
-    std::string prior;
-    bool success = false;
-    int failcount = 0;
-    do
-    {
-        AZS_DEBUGLOGV("About to call list_blobs_hierarchial.  Container = %s, delimiter = %s, continuation = %s, prefix = %s\n", container.c_str(), delimiter.c_str(), continuation.c_str(), prefix.c_str());
-
-        errno = 0;
-        list_blobs_hierarchical_response response = azure_blob_client_wrapper->list_blobs_hierarchical(container, delimiter, continuation, prefix);
-        if (errno == 0)
-        {
-            success = true;
-            failcount = 0;
-            AZS_DEBUGLOGV("Successful call to list_blobs_hierarchical.  results count = %s, next_marker = %s.\n", to_str(response.blobs.size()).c_str(), response.next_marker.c_str());
-            continuation = response.next_marker;
-            if(response.blobs.size() > 0)
-            {
-                bool skip_first = false;
-                if(response.blobs[0].name == prior)
-                {
-                    skip_first = true;
-                }
-                prior = response.blobs.back().name;
-                results.push_back(std::make_pair(std::move(response.blobs), skip_first));
-            }
-        }
-        else
-        {
-            failcount++;
-            success = false;
-            syslog(LOG_WARNING, "list_blobs_hierarchical failed for the %d time with errno = %d.\n", failcount, errno);
-
-        }
-    } while (((continuation.size() > 0) || !success) && (failcount < maxFailCount));
-
-    // errno will be set by list_blobs_hierarchial if the last call failed and we're out of retries.
-    return results;
-}
-
-/*
- * Check if the direcotry is empty or not by checking if there is any blob with prefix exists in the specified container.
- *
- * return
- *   - D_NOTEXIST if there's nothing there (the directory does not exist)
- *   - D_EMPTY is there's exactly one blob, and it's the ".directory" blob
- *   - D_NOTEMPTY otherwise (the directory exists and is not empty.)
- */
-int is_directory_empty(const std::string& container, const std::string& dir_name)
-{
-    std::string delimiter = "/";
-    bool dir_blob_exists = false;
-    errno = 0;
-    blob_property props = azure_blob_client_wrapper->get_blob_property(container, dir_name);
-    if ((errno == 0) && (props.valid()))
-    {
-        dir_blob_exists = is_directory_blob(props.size, props.metadata);
-    }
-    if (errno != 0)
-    {
-        if ((errno != 404) && (errno != ENOENT))
-        {
-            return -1; // Failure in fetching properties - errno set by blob_exists
-        }
-    }
-
-    std::string prefix_with_slash = dir_name;
-    prefix_with_slash.append(delimiter);
-    std::string continuation;
-    bool success = false;
-    int failcount = 0;
-    bool old_dir_blob_found = false;
-    do
-    {
-        errno = 0;
-        list_blobs_hierarchical_response response = azure_blob_client_wrapper->list_blobs_hierarchical(container, delimiter, continuation, prefix_with_slash, 2);
-        if (errno == 0)
-        {
-            success = true;
-            failcount = 0;
-            continuation = response.next_marker;
-            if (response.blobs.size() > 1)
-            {
-                return D_NOTEMPTY;
-            }
-            if (response.blobs.size() > 0)
-            {
-                if ((!old_dir_blob_found) &&
-                    (!response.blobs[0].is_directory) &&
-                    (response.blobs[0].name.size() > former_directory_signifier.size()) &&
-                    (0 == response.blobs[0].name.compare(response.blobs[0].name.size() - former_directory_signifier.size(), former_directory_signifier.size(), former_directory_signifier)))
-                {
-                    old_dir_blob_found = true;
-                }
-                else
-                {
-                    return D_NOTEMPTY;
-                }
-            }
-        }
-        else
-        {
-            success = false;
-            failcount++; //TODO: use to set errno.
-        }
-    } while ((continuation.size() > 0 || !success) && failcount < 20);
-
-    if (!success)
-    {
-    // errno will be set by list_blobs_hierarchial if the last call failed and we're out of retries.
-        return -1;
-    }
-
-    return old_dir_blob_found || dir_blob_exists ? D_EMPTY : D_NOTEXIST;
-}
-
-
 int azs_getattr(const char *path, struct stat *stbuf)
 {
     AZS_DEBUGLOGV("azs_getattr called with path = %s\n", path);
     // If we're at the root, we know it's a directory
     if (strlen(path) == 1)
     {
-        stbuf->st_mode = S_IFDIR | default_permission; // TODO: proper access control.
+        stbuf->st_mode = S_IFDIR | str_options.default_permission; // TODO: proper access control.
         stbuf->st_uid = fuse_get_context()->uid;
         stbuf->st_gid = fuse_get_context()->gid;
         stbuf->st_nlink = 2; // Directories should have a hard-link count of 2 + (# child directories).  We don't have that count, though, so we just use 2 for now.  TODO: Evaluate if we could keep this accurate or not.
@@ -436,53 +158,53 @@ int azs_getattr(const char *path, struct stat *stbuf)
     // It's not in the local cache.  Check to see if it's a blob on the service:
     std::string blobNameStr(&(path[1]));
     errno = 0;
-    auto blob_property = azure_blob_client_wrapper->get_blob_property(str_options.containerName, blobNameStr);
+    BfsFileProperty blob_property = storage_client->GetProperties(blobNameStr);
 
-    if ((errno == 0) && blob_property.valid())
+    if ((errno == 0) && blob_property.isValid())
     {
-        if (is_directory_blob(blob_property.size, blob_property.metadata))
+        if (is_directory_blob(blob_property.size(), blob_property.m_metadata))
         {
             AZS_DEBUGLOGV("Blob %s, representing a directory, found during get_attr.\n", path);
-            stbuf->st_mode = S_IFDIR | default_permission;
-            // If st_nlink = 2, means direcotry is empty.
+            stbuf->st_mode = S_IFDIR | str_options.default_permission;
+            // If st_nlink = 2, means directory is empty.
             // Directory size will affect behaviour for mv, rmdir, cp etc.
             stbuf->st_uid = fuse_get_context()->uid;
             stbuf->st_gid = fuse_get_context()->gid;
-            stbuf->st_nlink = is_directory_empty(str_options.containerName, blobNameStr) == D_EMPTY ? 2 : 3;
+            stbuf->st_nlink = storage_client->IsDirectory(blobNameStr.c_str()) == Constants::D_EMPTY ? 2 : 3;
             stbuf->st_size = 4096;
             return 0;
         }
 
         AZS_DEBUGLOGV("Blob %s, representing a file, found during get_attr.\n", path);
-        stbuf->st_mode = S_IFREG | default_permission; // Regular file (not a directory)
+        stbuf->st_mode = S_IFREG | str_options.default_permission; // Regular file (not a directory)
         stbuf->st_uid = fuse_get_context()->uid;
         stbuf->st_gid = fuse_get_context()->gid;
-        stbuf->st_mtime = blob_property.last_modified;
+        stbuf->st_mtime = blob_property.last_modified();
         stbuf->st_nlink = 1;
-        stbuf->st_size = blob_property.size;
+        stbuf->st_size = blob_property.size();
         return 0;
     }
-    else if (errno == 0 && !blob_property.valid())
+    else if (errno == 0 && !blob_property.isValid())
     {
         // Check to see if it's a directory, instead of a file
 
         errno = 0;
-        int dirSize = is_directory_empty(str_options.containerName, blobNameStr);
+        int dirSize = storage_client->IsDirectory(blobNameStr.c_str());
         if (errno != 0)
         {
             int storage_errno = errno;
             syslog(LOG_ERR, "Failure when attempting to determine if directory %s exists on the service.  errno = %d.\n", blobNameStr.c_str(), storage_errno);
             return 0 - map_errno(storage_errno);
         }
-        if (dirSize != D_NOTEXIST)
+        if (dirSize != Constants::D_NOTEXIST)
         {
             AZS_DEBUGLOGV("Directory %s found on the service.\n", blobNameStr.c_str());
-            stbuf->st_mode = S_IFDIR | default_permission;
+            stbuf->st_mode = S_IFDIR | str_options.default_permission;
             // If st_nlink = 2, means direcotry is empty.
             // Directory size will affect behaviour for mv, rmdir, cp etc.
             stbuf->st_uid = fuse_get_context()->uid;
             stbuf->st_gid = fuse_get_context()->gid;
-            stbuf->st_nlink = dirSize == D_EMPTY ? 2 : 3;
+            stbuf->st_nlink = dirSize == Constants::D_EMPTY ? 2 : 3;
             stbuf->st_size = 4096;
             return 0;
         }
@@ -577,13 +299,9 @@ int azs_rename_directory(const char *src, const char *dst)
 
     // Rename the directory blob, if it exists.
     errno = 0;
-    blob_property props = azure_blob_client_wrapper->get_blob_property(str_options.containerName, srcPathStr.substr(1));
-    if ((errno == 0) && (props.valid()))
+    if (storage_client->Exists(srcPathStr))
     {
-        if (is_directory_blob(props.size, props.metadata))
-        {
-            azs_rename_single_file(src, dst);
-        }
+        azs_rename_single_file(src, dst);
     }
     if (errno != 0)
     {
@@ -650,7 +368,7 @@ int azs_rename_directory(const char *src, const char *dst)
 
     // Rename all files & directories that don't exist in the local cache.
     errno = 0;
-    std::vector<std::pair<std::vector<list_blobs_hierarchical_item>, bool>> listResults = list_all_blobs_hierarchical(str_options.containerName, "/", srcPathStr.substr(1));
+    std::vector<std::pair<std::vector<list_hierarchical_item>, bool>> listResults = storage_client->ListAllItemsHierarchical("/", srcPathStr.substr(1));
     if (errno != 0)
     {
         int storage_errno = errno;

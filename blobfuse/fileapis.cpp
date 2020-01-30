@@ -7,6 +7,10 @@ std::mutex file_lock_map::s_mutex;
 std::deque<file_to_delete> cleanup;
 std::mutex deque_lock;
 
+struct str_options str_options;
+std::shared_ptr<StorageBfsClientBase> storage_client;
+std::shared_ptr<gc_cache> g_gc_cache;
+
 // Opens a file for reading or writing
 // Behavior is defined by a normal, open() system call.
 // In all methods in this file, the variables "path" and "pathString" refer to the input path - the path as seen by the application using FUSE as a file system.
@@ -30,7 +34,9 @@ int azs_open(const char *path, struct fuse_file_info *fi)
     struct stat buf;
     int statret = stat(mntPath, &buf);
     time_t now = time(NULL);
-    if ((statret != 0) || (((now - buf.st_mtime) > file_cache_timeout_in_seconds) && ((now - buf.st_ctime) > file_cache_timeout_in_seconds)))
+    if ((statret != 0) ||
+        (((now - buf.st_mtime) > str_options.file_cache_timeout_in_seconds) &&
+        ((now - buf.st_ctime) > str_options.file_cache_timeout_in_seconds)))
     {
         bool skipCacheUpdate = false;
         if (statret == 0) // File exists
@@ -351,7 +357,7 @@ int azs_release(const char *path, struct fuse_file_info * fi)
         AZS_DEBUGLOGV("Adding file to the GC from azs_release.  File = %s\n.", mntPath);
 
         // store the file in the cleanup list
-        g_gc_cache.add_file(pathString);
+        g_gc_cache->add_file(pathString);
 
     }
     else
@@ -558,7 +564,7 @@ int azs_rename_single_file(const char *src, const char *dst)
 {
     AZS_DEBUGLOGV("Renaming a single file.  src = %s, dst = %s.\n", src, dst);
 
-
+    storage_client->Rename(src, dst);
 
     return 0;
 }

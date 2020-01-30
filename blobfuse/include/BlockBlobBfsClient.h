@@ -5,8 +5,8 @@
 class BlockBlobBfsClient : StorageBfsClientBase
 {
 public:
-    BlockBlobBfsClient(std::string container, str_options str_options) :
-    StorageBfsClientBase(container,str_options)
+    BlockBlobBfsClient(str_options str_options) :
+    StorageBfsClientBase(str_options)
     {}
 
     ~BlockBlobBfsClient();
@@ -44,7 +44,7 @@ public:
     ///<summary>
     /// Helper function - Checks if the "directory" blob is empty
     ///</summary>
-    Constants::D_RETURN_CODE IsDirectoryEmpty(const char * path) override;
+    D_RETURN_CODE IsDirectoryEmpty(const char * path) override;
     ///<summary>
     /// Deletes a File
     ///</summary>

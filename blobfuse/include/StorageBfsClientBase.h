@@ -22,6 +22,7 @@ struct str_options
     std::string msiEndpoint;
     std::string containerName;
     std::string tmpPath;
+    int file_cache_timeout_in_seconds;
     bool use_https;
     bool use_attr_cache;
     //this is set by the --allow-other flag,
@@ -116,8 +117,7 @@ struct list_hierarchical_response {
 class StorageBfsClientBase
 {
 public:
-    StorageBfsClientBase(std::string container, str_options str_options) :
-        containerName(container), configurations(str_options)
+    StorageBfsClientBase(str_options str_options) : configurations(str_options)
     {}
 
     ~StorageBfsClientBase();
@@ -155,7 +155,7 @@ public:
     ///<summary>
     /// Helper function - Checks if the "directory" blob is empty
     ///</summary>
-    virtual Constants::D_RETURN_CODE IsDirectoryEmpty(const char * path) = 0;
+    virtual D_RETURN_CODE IsDirectoryEmpty(const char * path) = 0;
     ///<summary>
     /// Deletes a File
     ///</summary>
@@ -193,7 +193,6 @@ public:
     virtual std::vector<std::pair<std::vector<list_hierarchical_item>, bool>> ListAllItemsHierarchical(const std::string& delimiter, const std::string& prefix) const = 0;
 
 protected:
-    std::string containerName;
     str_options configurations;
 
     ///<summary>

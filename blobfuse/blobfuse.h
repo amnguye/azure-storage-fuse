@@ -40,7 +40,7 @@ GCRY_THREAD_OPTION_PTHREAD_IMPL;
 
 using namespace microsoft_azure::storage;
 
-extern gc_cache g_gc_cache;
+extern std::shared_ptr<gc_cache> g_gc_cache;
 
 // FUSE gives you one 64-bit pointer to use for communication between API's.
 // An instance of this struct is pointed to by that pointer.
@@ -56,14 +56,9 @@ struct fhwrapper
 
 extern struct str_options str_options;
 
-extern int file_cache_timeout_in_seconds;
-
 // This is used to make all the calls to Storage
 // The C++ lite client does not store state, other than connection info, so we can use it between calls without issue.
 extern std::shared_ptr<StorageBfsClientBase> storage_client;
-
-// Used to map HTTP errors (ex. 404) to Linux errno (ex ENOENT)
-extern std::map<int, int> error_mapping;
 
 // Helper function to map an HTTP error to an errno.
 // Should be called on any errno returned from the Azure Storage cpp lite lib.

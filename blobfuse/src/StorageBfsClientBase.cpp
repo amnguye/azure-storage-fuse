@@ -6,8 +6,8 @@
 
 int StorageBfsClientBase::map_errno(int error)
 {
-    auto mapping = Constants::error_mapping.find(error);
-    if (mapping == Constants::error_mapping.end())
+    auto mapping = error_mapping.find(error);
+    if (mapping == error_mapping.end())
     {
         syslog(LOG_INFO, "Failed to map storage error code %d to a proper errno.  Returning EIO = %d instead.\n", error, EIO);
         return EIO;

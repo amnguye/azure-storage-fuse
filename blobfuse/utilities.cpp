@@ -170,7 +170,7 @@ int azs_getattr(const char *path, struct stat *stbuf)
             // Directory size will affect behaviour for mv, rmdir, cp etc.
             stbuf->st_uid = fuse_get_context()->uid;
             stbuf->st_gid = fuse_get_context()->gid;
-            stbuf->st_nlink = storage_client->IsDirectory(blobNameStr.c_str()) == Constants::D_EMPTY ? 2 : 3;
+            stbuf->st_nlink = storage_client->IsDirectory(blobNameStr.c_str()) == D_EMPTY ? 2 : 3;
             stbuf->st_size = 4096;
             return 0;
         }
@@ -196,7 +196,7 @@ int azs_getattr(const char *path, struct stat *stbuf)
             syslog(LOG_ERR, "Failure when attempting to determine if directory %s exists on the service.  errno = %d.\n", blobNameStr.c_str(), storage_errno);
             return 0 - map_errno(storage_errno);
         }
-        if (dirSize != Constants::D_NOTEXIST)
+        if (dirSize != D_NOTEXIST)
         {
             AZS_DEBUGLOGV("Directory %s found on the service.\n", blobNameStr.c_str());
             stbuf->st_mode = S_IFDIR | str_options.default_permission;
@@ -204,7 +204,7 @@ int azs_getattr(const char *path, struct stat *stbuf)
             // Directory size will affect behaviour for mv, rmdir, cp etc.
             stbuf->st_uid = fuse_get_context()->uid;
             stbuf->st_gid = fuse_get_context()->gid;
-            stbuf->st_nlink = dirSize == Constants::D_EMPTY ? 2 : 3;
+            stbuf->st_nlink = dirSize == D_EMPTY ? 2 : 3;
             stbuf->st_size = 4096;
             return 0;
         }

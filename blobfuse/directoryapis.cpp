@@ -150,7 +150,7 @@ int azs_readdir(const char *path, void *buf, fuse_fill_dir_t filler, off_t, stru
                 {
                     if (!listResults[result_lists_index].first[i].is_directory && !is_directory_blob(listResults[result_lists_index].first[i].content_length, listResults[result_lists_index].first[i].metadata))
                     {
-                        if ((prev_token_str.size() > 0) && (strcmp(prev_token_str.c_str(), Constants::former_directory_signifier.c_str()) != 0))
+                        if ((prev_token_str.size() > 0) && (strcmp(prev_token_str.c_str(), former_directory_signifier.c_str()) != 0))
                         {
                             struct stat stbuf;
                             stbuf.st_mode = S_IFREG | str_options.default_permission; // Regular file (not a directory)

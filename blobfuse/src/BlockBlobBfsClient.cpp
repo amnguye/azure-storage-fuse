@@ -11,7 +11,7 @@ void BlockBlobBfsClient::UploadFromFile(std::string sourcePath)
     std::vector<std::pair<std::string, std::string>> metadata;
     std::string blobName = sourcePath.substr(configurations.tmpPath.size() + 6 /* there are six characters in "/root/" */);
 
-    m_blob_client->upload_file_to_blob(sourcePath, containerName, blobName);
+    m_blob_client->upload_file_to_blob(sourcePath, configurations.containerName, blobName);
 
     // upload_file_to_blob does not return a status or success if the blob succeeded
     // it does syslog if there was an exception and changes the errno.
@@ -22,7 +22,7 @@ void BlockBlobBfsClient::UploadFromFile(std::string sourcePath)
 ///<returns>none</returns>
 void BlockBlobBfsClient::UploadFromStream(std::istream & sourceStream, std::string blobName)
 {
-    m_blob_client->upload_block_blob_from_stream(containerName, blobName, sourceStream);
+    m_blob_client->upload_block_blob_from_stream(configurations.containerName, blobName, sourceStream);
 }
 ///<summary>
 /// Downloads contents of a block blob to a local file
@@ -31,7 +31,7 @@ void BlockBlobBfsClient::UploadFromStream(std::istream & sourceStream, std::stri
 void BlockBlobBfsClient::DownloadToFile(std::string blobName, std::string filePath)
 {
     time_t last_modified = {};
-    m_blob_client->download_blob_to_file(containerName, blobName, filePath, last_modified);
+    m_blob_client->download_blob_to_file(configurations.containerName, blobName, filePath, last_modified);
 }
 ///<summary>
 /// Creates a Directory
@@ -48,7 +48,7 @@ bool BlockBlobBfsClient::CreateDirectory(const char * directoryPath)
     errno = 0;
 
     m_blob_client->upload_block_blob_from_stream(
-            containerName,
+            configurations.containerName,
             directoryPathStr.substr(1),
             emptyDataStream,
             metadata);
@@ -83,7 +83,7 @@ bool BlockBlobBfsClient::DeleteDirectory(const char * directoryPath)
     // "hdi_isfolder"
 
     errno = 0;
-    Constants::D_RETURN_CODE dir_blob_exists = IsDirectoryEmpty(directoryPath);
+    D_RETURN_CODE dir_blob_exists = IsDirectoryEmpty(directoryPath);
 
     if (errno != 0)
     {
@@ -93,14 +93,14 @@ bool BlockBlobBfsClient::DeleteDirectory(const char * directoryPath)
         }
         switch(dir_blob_exists)
         {
-            case Constants::D_NOTEXIST:
+            case D_NOTEXIST:
                 //log that the directory does not exist
                 return false;
                 break;
-            case Constants::D_EMPTY:
+            case D_EMPTY:
                 DeleteFile((std::string)directoryPath);
                 return true;
-            case Constants::D_NOTEMPTY:
+            case D_NOTEMPTY:
                 return false;
             default:
                 // Unforseen error,syslog and return false
@@ -115,7 +115,7 @@ bool BlockBlobBfsClient::DeleteDirectory(const char * directoryPath)
 ///<returns>none</returns>
 void BlockBlobBfsClient::DeleteFile(std::string pathToDelete)
 {
-    m_blob_client->delete_blob(containerName, pathToDelete);
+    m_blob_client->delete_blob(configurations.containerName, pathToDelete);
 }
 ///<summary>
 /// Gets the properties of a path
@@ -123,7 +123,7 @@ void BlockBlobBfsClient::DeleteFile(std::string pathToDelete)
 ///<returns>BfsFileProperty object which contains the property details of the file</returns>
 BfsFileProperty BlockBlobBfsClient::GetProperties(std::string pathName)
 {
-    blob_property property = m_blob_client->get_blob_property(containerName, pathName);
+    blob_property property = m_blob_client->get_blob_property(configurations.containerName, pathName);
 
     BfsFileProperty ret_property(property.cache_control,
             property.content_disposition,
@@ -145,7 +145,7 @@ BfsFileProperty BlockBlobBfsClient::GetProperties(std::string pathName)
 int BlockBlobBfsClient::Exists(std::string pathName)
 {
     errno = 0;
-    blob_property property = m_blob_client->get_blob_property(containerName, pathName);
+    blob_property property = m_blob_client->get_blob_property(configurations.containerName, pathName);
 
     if(errno != 0)
     {
@@ -166,7 +166,7 @@ int BlockBlobBfsClient::Exists(std::string pathName)
 ///<returns>none</returns>
 bool BlockBlobBfsClient::Copy(std::string sourcePath, std::string destinationPath)
 {
-    m_blob_client->start_copy(containerName, sourcePath, containerName, destinationPath);
+    m_blob_client->start_copy(configurations.containerName, sourcePath, configurations.containerName, destinationPath);
     return true;
 }
 ///<summary>
@@ -256,7 +256,7 @@ BlockBlobBfsClient::List(std::string delimiter, std::string continuation, std::s
 
     //TODO: MAKE THIS BETTER
     list_blobs_hierarchical_response listed_blob_response = m_blob_client->list_blobs_hierarchical(
-            containerName,
+            configurations.containerName,
             delimiter,
             continuation,
             prefix);
@@ -270,7 +270,7 @@ BlockBlobBfsClient::List(std::string delimiter, std::string continuation, std::s
 ///<returns>none</returns>
 bool BlockBlobBfsClient::IsDirectory(const char * path)
 {
-    blob_property props = m_blob_client->get_blob_property(containerName, path);
+    blob_property props = m_blob_client->get_blob_property(configurations.containerName, path);
 
     if(props.valid()) {
         if (props.size == 0) {
@@ -297,7 +297,7 @@ bool BlockBlobBfsClient::IsDirectory(const char * path)
  *   - D_EMPTY is there's exactly one blob, and it's the ".directory" blob
  *   - D_NOTEMPTY otherwise (the directory exists and is not empty.)
  */
-Constants::D_RETURN_CODE BlockBlobBfsClient::IsDirectoryEmpty(const char *path)
+D_RETURN_CODE BlockBlobBfsClient::IsDirectoryEmpty(const char *path)
 {
     std::string delimiter = "/";
     std::string prefix_with_slash = path;
@@ -309,7 +309,7 @@ Constants::D_RETURN_CODE BlockBlobBfsClient::IsDirectoryEmpty(const char *path)
     do
     {
         errno = 0;
-        list_blobs_hierarchical_response response = m_blob_client->list_blobs_hierarchical(containerName, delimiter, continuation, prefix_with_slash, 2);
+        list_blobs_hierarchical_response response = m_blob_client->list_blobs_hierarchical(configurations.containerName, delimiter, continuation, prefix_with_slash, 2);
         if (errno == 0)
         {
             success = true;
@@ -317,20 +317,20 @@ Constants::D_RETURN_CODE BlockBlobBfsClient::IsDirectoryEmpty(const char *path)
             continuation = response.next_marker;
             if (response.blobs.size() > 1)
             {
-                return Constants::D_NOTEMPTY;
+                return D_NOTEMPTY;
             }
             if (response.blobs.size() > 0)
             {
                 if ((!old_dir_blob_found) &&
                     (!response.blobs[0].is_directory) &&
-                    (response.blobs[0].name.size() > Constants::former_directory_signifier.size()) &&
-                    (0 == response.blobs[0].name.compare(response.blobs[0].name.size() - Constants::former_directory_signifier.size(), Constants::former_directory_signifier.size(), Constants::former_directory_signifier)))
+                    (response.blobs[0].name.size() > former_directory_signifier.size()) &&
+                    (0 == response.blobs[0].name.compare(response.blobs[0].name.size() - former_directory_signifier.size(), former_directory_signifier.size(), former_directory_signifier)))
                 {
                     old_dir_blob_found = true;
                 }
                 else
                 {
-                    return Constants::D_NOTEMPTY;
+                    return D_NOTEMPTY;
                 }
             }
         }
@@ -344,10 +344,10 @@ Constants::D_RETURN_CODE BlockBlobBfsClient::IsDirectoryEmpty(const char *path)
     if (!success)
     {
         // errno will be set by list_blobs_hierarchial if the last call failed and we're out of retries.
-        return Constants::D_FAILED;
+        return D_FAILED;
     }
 
-    return old_dir_blob_found ? Constants::D_EMPTY : Constants::D_NOTEMPTY;
+    return old_dir_blob_found ? D_EMPTY : D_NOTEMPTY;
 }
 
 int BlockBlobBfsClient::rename_single_file(const char * src, const char * dst, std::vector<std::string> & files_to_remove_cache)
@@ -711,7 +711,7 @@ std::vector<std::pair<std::vector<list_hierarchical_item>, bool>> BlockBlobBfsCl
     do
     {
         AZS_DEBUGLOGV("About to call list_blobs_hierarchial.  Container = %s, delimiter = %s, continuation = %s, prefix = %s\n",
-                containerName.c_str(),
+                configurations.containerName.c_str(),
                 delimiter.c_str(),
                 continuation.c_str(),
                 prefix.c_str());

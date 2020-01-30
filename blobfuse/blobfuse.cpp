@@ -28,7 +28,6 @@ struct options
 };
 
 struct options options;
-struct str_options str_options;
 int file_cache_timeout_in_seconds;
 
 #define OPTION(t, p) { t, offsetof(struct options, p), 1 }
@@ -376,7 +375,9 @@ void *azs_init(struct fuse_conn_info * conn)
     conn->max_background = 128;
     //  conn->want |= FUSE_CAP_WRITEBACK_CACHE | FUSE_CAP_EXPORT_SUPPORT; // TODO: Investigate putting this back in when we downgrade to fuse 2.9
 
-    g_gc_cache.run();
+    storage_client = std::make_shared<BlockBlobBfsClient>(str_options);
+    g_gc_cache = std::make_shared<g_gc_cache>(str_options.tmpPath, str_options.file_cache_timeout_in_seconds);
+    g_gc_cache->run();
 
     return NULL;
 }
@@ -619,7 +620,7 @@ int read_and_set_arguments(int argc, char *argv[], struct fuse_args *args)
     if (options.file_cache_timeout_in_seconds != NULL)
     {
         std::string timeout(options.file_cache_timeout_in_seconds);
-        file_cache_timeout_in_seconds = stoi(timeout);
+        str_options.file_cache_timeout_in_seconds = stoi(timeout);
     }
     else
     {

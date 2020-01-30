@@ -139,12 +139,15 @@ set(AZURE_STORAGE_SOURCE
 
 
 set (BLOBFUSE_HEADER
+  blobfuse/include/Constants.h
   blobfuse/blobfuse.h
   blobfuse/OAuthToken.h
   blobfuse/OAuthTokenCredentialManager.h
   blobfuse/include/StorageBfsClientBase.h
   blobfuse/include/BlockBlobBfsClient.h
-        blobfuse/Constants.h blobfuse/include/file_lock_map.h blobfuse/include/gc_cache.h blobfuse/include/DataLakeBfsClient.h)
+  blobfuse/include/file_lock_map.h
+  blobfuse/include/gc_cache.h
+  blobfuse/include/DataLakeBfsClient.h)
 
 set (BLOBFUSE_SOURCE
 #  blobfuse/blobfuse.cpp    # We don't include blobfuse.cpp because the file contents are directly #included in main.cpp.  This allows us to split main() and everything
@@ -157,7 +160,8 @@ set (BLOBFUSE_SOURCE
   blobfuse/OAuthTokenCredentialManager.cpp
   blobfuse/src/StorageBfsClientBase.cpp
   blobfuse/src/BlockBlobBfsClient.cpp
-        blobfuse/src/file_lock_map.cpp blobfuse/src/gc_cache.cpp blobfuse/src/DataLakeBfsClient.cpp)
+  blobfuse/src/file_lock_map.cpp blobfuse/src/gc_cache.cpp
+  blobfuse/src/DataLakeBfsClient.cpp)
 
 if(UNIX)
   project(blobfuse)
@@ -177,7 +181,7 @@ if(UNIX)
 
   set(CMAKE_MACOSX_RPATH ON)
 
-  add_executable(blobfuse ${BLOBFUSE_HEADER} ${BLOBFUSE_SOURCE} ${AZURE_STORAGE_HEADER} ${AZURE_STORAGE_SOURCE} blobfuse/include/file_lock_map.h blobfuse/src/file_lock_map.cpp blobfuse/include/gc_cache.h blobfuse/src/gc_cache.cpp blobfuse/include/DataLakeBfsClient.h blobfuse/src/DataLakeBfsClient.cpp)
+  add_executable(blobfuse ${BLOBFUSE_HEADER} ${BLOBFUSE_SOURCE} ${AZURE_STORAGE_HEADER} ${AZURE_STORAGE_SOURCE})
 
   pkg_search_module(UUID REQUIRED uuid)
   target_link_libraries(blobfuse ${CURL_LIBRARIES} ${GNUTLS_LIBRARIES} ${CMAKE_THREAD_LIBS_INIT} ${UUID_LIBRARIES} ${Boost_FILESYSTEM_LIBRARY} ${Boost_SYSTEM_LIBRARY} ${Boost_THREAD_LIBRARY} fuse gcrypt)

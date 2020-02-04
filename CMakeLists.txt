@@ -153,6 +153,8 @@ set (BLOBFUSE_SOURCE
 #  blobfuse/blobfuse.cpp    # We don't include blobfuse.cpp because the file contents are directly #included in main.cpp.  This allows us to split main() and everything
 #                             else into different files, without having to define each function in a header for only one consumer.  The only reason to do all this is so
 #                             we can test functionality in blobfuse.cpp without including main() (which would break gtest).
+  blobfuse/main.cpp
+  blobfuse/blobfuse.cpp
   blobfuse/fileapis.cpp
   blobfuse/directoryapis.cpp
   blobfuse/utilities.cpp

@@ -12,7 +12,7 @@
 struct str_options
 {
     std::string accountName;
-    std::string authType;
+    AUTH_TYPE authType;
     std::string blobEndpoint;
     std::string accountKey;
     std::string sasToken;
@@ -22,12 +22,12 @@ struct str_options
     std::string msiEndpoint;
     std::string containerName;
     std::string tmpPath;
-    int file_cache_timeout_in_seconds;
-    bool use_https;
-    bool use_attr_cache;
+    int fileCacheTimeoutInSeconds;
+    bool useHttps;
+    bool useAttrCache;
     //this is set by the --allow-other flag,
     // 0770 if not set, 0777 if the flag is set
-    int default_permission;
+    int defaultPermission;
 };
 
 struct BfsFileProperty
@@ -119,8 +119,11 @@ class StorageBfsClientBase
 public:
     StorageBfsClientBase(str_options str_options) : configurations(str_options)
     {}
-
-    ~StorageBfsClientBase();
+    ///<summary>
+    /// Authenticates the storage account and container
+    ///</summary>
+    ///<returns>bool: if we authenticate to the storage account and container successfully</returns>
+    virtual bool AuthenticateStorage() = 0;
     ///<summary>
     /// Uploads contents of a file to a storage object(e.g. blob, file) to the Storage service
     ///</summary>
@@ -190,7 +193,7 @@ public:
     /// LIsts all directories within a list container
     /// Greedily list all blobs using the input params.
     ///</summary>
-    virtual std::vector<std::pair<std::vector<list_hierarchical_item>, bool>> ListAllItemsHierarchical(const std::string& delimiter, const std::string& prefix) const = 0;
+    virtual std::vector<std::pair<std::vector<list_hierarchical_item>, bool>> ListAllItemsHierarchical(const std::string& delimiter, const std::string& prefix) = 0;
 
 protected:
     str_options configurations;

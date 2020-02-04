@@ -1,6 +1,159 @@
 #include <sys/stat.h>
+#include "storage_errno.h"
 #include "include/BlockBlobBfsClient.h"
 
+///<summary>
+/// Authenticates the storage account and container
+///</summary>
+///<returns>bool: if we authenticate to the storage account and container successfully</returns>
+bool BlockBlobBfsClient::AuthenticateStorage()
+{
+    // Authenticate the storage account
+    switch (configurations.authType) {
+        case KEY_AUTH:
+            m_blob_client = authenticate_accountkey();
+            break;
+        case SAS_AUTH:
+            m_blob_client = authenticate_sas();
+            break;
+        case MSI_AUTH:
+            m_blob_client = authenticate_msi();
+            break;
+        default:
+            return false;
+            break;
+    }
+
+    if(m_blob_client->is_valid())
+    {
+        //Authenticate the storage container by using a list call
+        m_blob_client->list_blobs_hierarchical(
+                configurations.containerName,
+                "/",
+                std::string(),
+                std::string(),
+                1);
+        if (errno != 0) {
+            syslog(LOG_ERR,
+                   "Unable to start blobfuse.  Failed to connect to the storage container. There might be something wrong about the storage config, please double check the storage account name, account key/sas token/OAuth access token and container name. errno = %d\n",
+                   errno);
+            return false;
+        }
+        return true;
+    }
+    return false;
+}
+
+std::shared_ptr<sync_blob_client> BlockBlobBfsClient::authenticate_accountkey()
+{
+    try
+    {
+        std::shared_ptr<storage_credential> cred;
+        if (configurations.accountKey.length() > 0)
+        {
+            cred = std::make_shared<shared_key_credential>(configurations.accountName, configurations.accountKey);
+        }
+        else
+        {
+            syslog(LOG_ERR, "Empty account key. Failed to create blob client.");
+            return std::make_shared<blob_client_wrapper>(false);
+        }
+        std::shared_ptr<storage_account> account = std::make_shared<storage_account>(
+                configurations.accountName,
+                cred,
+                configurations.useHttps,
+                configurations.blobEndpoint);
+        std::shared_ptr<blob_client> blobClient= std::make_shared<microsoft_azure::storage::blob_client>(
+                account,
+                max_concurrency_blob_wrapper);
+        errno = 0;
+        if(configurations.useAttrCache){
+            return std::make_shared<blob_client_attr_cache_wrapper>(std::make_shared<blob_client_wrapper>(blobClient));
+        }
+        return std::make_shared<blob_client_wrapper>(blobClient);
+    }
+    catch(const std::exception &ex)
+    {
+        syslog(LOG_ERR, "Failed to create blob client.  ex.what() = %s.", ex.what());
+        errno = unknown_error;
+        return std::make_shared<blob_client_wrapper>(false);
+    }
+}
+std::shared_ptr<sync_blob_client> BlockBlobBfsClient::authenticate_sas()
+{
+    try
+    {
+        std::shared_ptr<storage_credential> cred;
+        if(configurations.sasToken.length() > 0)
+        {
+            cred = std::make_shared<shared_access_signature_credential>(configurations.sasToken);
+        }
+        else
+        {
+            syslog(LOG_ERR, "Empty account key. Failed to create blob client.");
+            return std::make_shared<blob_client_wrapper>(false);
+        }
+        std::shared_ptr<storage_account> account = std::make_shared<storage_account>(
+                configurations.accountName, cred,
+                configurations.useHttps,
+                configurations.blobEndpoint);
+        std::shared_ptr<blob_client> blobClient= std::make_shared<microsoft_azure::storage::blob_client>(
+                account,
+                max_concurrency_blob_wrapper);
+        errno = 0;
+        if(configurations.useAttrCache){
+            return std::make_shared<blob_client_attr_cache_wrapper>(std::make_shared<blob_client_wrapper>(blobClient));
+        }
+        return std::make_shared<blob_client_wrapper>(blobClient);
+    }
+    catch(const std::exception &ex)
+    {
+        syslog(LOG_ERR, "Failed to create blob client.  ex.what() = %s.", ex.what());
+        errno = unknown_error;
+        return std::make_shared<blob_client_wrapper>(false);
+    }
+}
+std::shared_ptr<sync_blob_client> BlockBlobBfsClient::authenticate_msi()
+{
+    try
+    {
+        //1. get oauth token
+        std::function<OAuthToken(std::shared_ptr<CurlEasyClient>)> MSICallback = SetUpMSICallback(
+                configurations.clientId,
+                configurations.objectId,
+                configurations.resourceId,
+                configurations.msiEndpoint);
+
+        std::shared_ptr<OAuthTokenCredentialManager> tokenManager = GetTokenManagerInstance(MSICallback);
+
+        if (!tokenManager->is_valid_connection()) {
+            // todo: isolate definitions of errno's for this function so we can output something meaningful.
+            errno = 1;
+        }
+
+        //2. try to make blob client wrapper using oauth token
+        std::shared_ptr<storage_credential> cred = std::make_shared<token_credential>();
+        std::shared_ptr<storage_account> account = std::make_shared<storage_account>(
+                configurations.accountName,
+                cred,
+                true, //use_https must be true to use oauth
+                configurations.blobEndpoint);
+        std::shared_ptr<blob_client> blobClient =
+                std::make_shared<microsoft_azure::storage::blob_client>(account, max_concurrency_oauth);
+        errno = 0;
+        if(configurations.useAttrCache){
+            return std::make_shared<blob_client_attr_cache_wrapper>(std::make_shared<blob_client_wrapper>(blobClient));
+        }
+        return std::make_shared<blob_client_wrapper>(blobClient);
+
+    }
+    catch(const std::exception &ex)
+    {
+        syslog(LOG_ERR, "Failed to create blob client.  ex.what() = %s. Please check your account name and ", ex.what());
+        errno = unknown_error;
+        return  std::make_shared<blob_client_wrapper>(false);
+    }
+}
 ///<summary>
 /// Uploads contents of a file to a block blob to the Storage service
 ///</summary>
@@ -678,7 +831,7 @@ int BlockBlobBfsClient::ensure_directory_path_exists_cache(const std::string & f
             struct stat st;
             if (stat(copypath, &st) != 0)
             {
-                status = mkdir(copypath, configurations.default_permission);
+                status = mkdir(copypath, configurations.defaultPermission);
             }
 
             // Ignore if some other thread was successful creating the path

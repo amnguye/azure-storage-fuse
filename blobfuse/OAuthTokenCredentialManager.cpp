@@ -1,12 +1,9 @@
-//
-// Created by amanda on 11/19/19.
-//
 #include "OAuthTokenCredentialManager.h"
 #include <http_base.h>
 #include <json.hpp>
 #include <iomanip>
 #include "OAuthToken.h"
-#include "constants.h"
+#include "Constants.h"
 #include "utility.h"
 #include <syslog.h>
 
@@ -43,7 +40,7 @@ OAuthTokenCredentialManager::OAuthTokenCredentialManager(
         return;
     }
 
-    httpClient = std::make_shared<CurlEasyClient>(constants::max_concurrency_oauth);
+    httpClient = std::make_shared<CurlEasyClient>(max_concurrency_oauth);
     refreshTokenCallback = refreshCallback;
 
     try {
@@ -196,7 +193,7 @@ std::function<OAuthToken(std::shared_ptr<CurlEasyClient>)> SetUpMSICallback(std:
         request_handle->set_output_stream(ios.ostream());
 
         // TODO: decide retry interval, also make constant
-        std::chrono::seconds retry_interval(constants::max_retry_oauth);
+        std::chrono::seconds retry_interval(max_retry_oauth);
         OAuthToken parsed_token;
         request_handle->submit([&parsed_token, &ios](http_base::http_code http_code_result, const storage_istream&, CURLcode curl_code)
         {

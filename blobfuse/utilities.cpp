@@ -90,7 +90,7 @@ int ensure_files_directory_exists_in_cache(const std::string& file_path)
             struct stat st;
             if (stat(copypath, &st) != 0)
             {
-                status = mkdir(copypath, str_options.default_permission);
+                status = mkdir(copypath, str_options.defaultPermission);
             }
 
             // Ignore if some other thread was successful creating the path
@@ -114,7 +114,7 @@ int azs_getattr(const char *path, struct stat *stbuf)
     // If we're at the root, we know it's a directory
     if (strlen(path) == 1)
     {
-        stbuf->st_mode = S_IFDIR | str_options.default_permission; // TODO: proper access control.
+        stbuf->st_mode = S_IFDIR | str_options.defaultPermission; // TODO: proper access control.
         stbuf->st_uid = fuse_get_context()->uid;
         stbuf->st_gid = fuse_get_context()->gid;
         stbuf->st_nlink = 2; // Directories should have a hard-link count of 2 + (# child directories).  We don't have that count, though, so we just use 2 for now.  TODO: Evaluate if we could keep this accurate or not.
@@ -165,7 +165,7 @@ int azs_getattr(const char *path, struct stat *stbuf)
         if (is_directory_blob(blob_property.size(), blob_property.m_metadata))
         {
             AZS_DEBUGLOGV("Blob %s, representing a directory, found during get_attr.\n", path);
-            stbuf->st_mode = S_IFDIR | str_options.default_permission;
+            stbuf->st_mode = S_IFDIR | str_options.defaultPermission;
             // If st_nlink = 2, means directory is empty.
             // Directory size will affect behaviour for mv, rmdir, cp etc.
             stbuf->st_uid = fuse_get_context()->uid;
@@ -176,7 +176,7 @@ int azs_getattr(const char *path, struct stat *stbuf)
         }
 
         AZS_DEBUGLOGV("Blob %s, representing a file, found during get_attr.\n", path);
-        stbuf->st_mode = S_IFREG | str_options.default_permission; // Regular file (not a directory)
+        stbuf->st_mode = S_IFREG | str_options.defaultPermission; // Regular file (not a directory)
         stbuf->st_uid = fuse_get_context()->uid;
         stbuf->st_gid = fuse_get_context()->gid;
         stbuf->st_mtime = blob_property.last_modified();
@@ -199,7 +199,7 @@ int azs_getattr(const char *path, struct stat *stbuf)
         if (dirSize != D_NOTEXIST)
         {
             AZS_DEBUGLOGV("Directory %s found on the service.\n", blobNameStr.c_str());
-            stbuf->st_mode = S_IFDIR | str_options.default_permission;
+            stbuf->st_mode = S_IFDIR | str_options.defaultPermission;
             // If st_nlink = 2, means direcotry is empty.
             // Directory size will affect behaviour for mv, rmdir, cp etc.
             stbuf->st_uid = fuse_get_context()->uid;

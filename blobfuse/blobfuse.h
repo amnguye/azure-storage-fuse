@@ -64,15 +64,6 @@ extern std::shared_ptr<StorageBfsClientBase> storage_client;
 // Should be called on any errno returned from the Azure Storage cpp lite lib.
 int map_errno(int error);
 
-enum auth_type {
-    MSI_AUTH,
-    SAS_AUTH,
-    KEY_AUTH,
-    INVALID_AUTH
-};
-
-auth_type get_auth_type();
-
 // Read Storage connection information from the config file
 int read_config(std::string configFile);
 
@@ -88,6 +79,21 @@ int ensure_files_directory_exists_in_cache(const std::string& file_path);
 
 // Returns true if the input has zero length and the "hdi_isfolder=true" metadata.
 bool is_directory_blob(unsigned long long size, std::vector<std::pair<std::string, std::string>> metadata);
+
+// Sets up blobfuse to fuse operations
+void set_up_callbacks(fuse_operations&);
+
+// Reads options/flags/argument set by mount comment
+int read_and_set_arguments(int argc, char *argv[], struct fuse_args *args);
+
+// Configures gcrypt for locking p threads
+int configure_tls();
+
+// Configure fuse arguements
+void configure_fuse(struct fuse_args *args);
+
+// Initializes blobfuse cache temporary directory
+int initialize_blobfuse();
 
 /**
  * get_attr is the general-purpose "get information about the file or directory at this path"

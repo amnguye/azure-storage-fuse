@@ -4,9 +4,13 @@
 #include <syslog.h>
 #include "Constants.h"
 #include "file_lock_map.h"
+#include "storage_errno.h"
 
 //TODO: to remove once we unify list responses
 #include "list_blobs_request_base.h"
+
+#ifndef STORAGEBFSCLIENTBASE_H
+#define STORAGEBFSCLIENTBASE_H
 
 // Global struct storing the Storage connection information and the tmpPath.
 struct str_options
@@ -129,27 +133,27 @@ public:
     ///</summary>
     ///TODO: params
     ///<returns>none</returns>
-    virtual void UploadFromFile(std::string localPath) = 0;
+    virtual void UploadFromFile(const std::string localPath) = 0;
     ///<summary>
     /// Uploads contents of a stream to a storage object(e.g. blob, file) to the Storage service
     ///</summary>
     ///<returns>none</returns>
-    virtual void UploadFromStream(std::istream & sourceStream, std::string blobName) = 0;
+    virtual void UploadFromStream(std::istream & sourceStream, const std::string blobName) = 0;
     ///<summary>
     /// Downloads contents of a storage object(e.g. blob, file) to a local file
     ///</summary>
     ///<returns>none</returns>
-    virtual void DownloadToFile(std::string blobName, std::string filePath) = 0;
+    virtual void DownloadToFile(const std::string blobName, const std::string filePath) = 0;
     ///<summary>
     /// Creates a Directory
     ///</summary>
     ///<returns>none</returns>
-    virtual bool CreateDirectory(const char * directoryPath) = 0;
+    virtual bool CreateDirectory(const std::string directoryPath) = 0;
     ///<summary>
     /// Deletes a Directory
     ///</summary>
     ///<returns>none</returns>
-    virtual bool DeleteDirectory(const char * directoryPath) = 0;
+    virtual bool DeleteDirectory(const std::string directoryPath) = 0;
     ///<summary>
     /// Checks if the blob is a directory
     ///</summary>
@@ -158,37 +162,37 @@ public:
     ///<summary>
     /// Helper function - Checks if the "directory" blob is empty
     ///</summary>
-    virtual D_RETURN_CODE IsDirectoryEmpty(const char * path) = 0;
+    virtual D_RETURN_CODE IsDirectoryEmpty(std::string path) = 0;
     ///<summary>
     /// Deletes a File
     ///</summary>
     ///<returns>none</returns>
-    virtual void DeleteFile(std::string pathToDelete) = 0;
+    virtual void DeleteFile(const std::string pathToDelete) = 0;
     ///<summary>
     /// Determines whether or not a path (file or directory) exists or not
     ///</summary>
     ///<returns>none</returns>
-    virtual int Exists(std::string pathName) = 0;
+    virtual int Exists(const std::string pathName) = 0;
     ///<summary>
     /// Gets the properties of a path
     ///</summary>
     ///<returns>BfsFileProperty object which contains the property details of the file</returns>
-    virtual BfsFileProperty GetProperties(std::string pathName) = 0;
+    virtual BfsFileProperty GetProperties(const std::string pathName) = 0;
     ///<summary>
     /// Determines whether or not a path (file or directory) exists or not
     ///</summary>
     ///<returns>none</returns>
-    virtual bool Copy(std::string sourcePath, std::string destinationPath) = 0;
+    virtual bool Copy(const std::string sourcePath, const std::string destinationPath) = 0;
     ///<summary>
     /// Renames a file
     ///</summary>
     ///<returns>none</returns>
-    virtual std::vector<std::string> Rename(std::string sourcePath, std::string destinationPath) = 0;
+    virtual std::vector<std::string> Rename(const std::string sourcePath,const  std::string destinationPath) = 0;
     ///<summary>
     /// Lists
     ///</summary>
     ///<returns>none</returns>
-    virtual list_hierarchical_response List(std::string delimiter, std::string continuation, std::string prefix) const = 0;
+    virtual list_hierarchical_response List(const std::string delimiter, std::string continuation, const std::string prefix) const = 0;
     ///<summary>
     /// LIsts all directories within a list container
     /// Greedily list all blobs using the input params.
@@ -207,3 +211,5 @@ protected:
     ///</summary>
     std::string prepend_mnt_path_string(const std::string& path);
 };
+
+#endif

@@ -2,6 +2,9 @@
 #include <map>
 #include <memory>
 
+#ifndef FILE_LOCK_MAP_H
+#define FILE_LOCK_MAP_H
+
 // We use two different locking schemes to protect files / blobs against data corruption and data loss scenarios.
 // The first is an in-memory std::mutex, the second is flock (Linux).  Each file path gets its own mutex and flock lock.
 // The in-memory mutex should only be held while control is in a method that is directly communicating with Azure Storage.
@@ -28,3 +31,4 @@ private:
     std::mutex m_mutex;
     std::map<std::string, std::shared_ptr<std::mutex>> m_lock_map;
 };
+#endif //FILE_LOCK_MAP_H

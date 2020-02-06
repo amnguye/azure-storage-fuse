@@ -8,6 +8,9 @@
 #define AZS_DEBUGLOGV(fmt,...) do {syslog(LOG_DEBUG,"Function %s, in file %s, line %d: " fmt, __func__, __FILE__, __LINE__, __VA_ARGS__); } while(0)
 #define AZS_DEBUGLOG(fmt) do {syslog(LOG_DEBUG,"Function %s, in file %s, line %d: " fmt, __func__, __FILE__, __LINE__); } while(0)
 
+#ifndef CONSTANT_H_
+#define CONSTANT_H_
+
 enum D_RETURN_CODE
 {
     D_NOTEXIST = -1,
@@ -39,3 +42,5 @@ const int max_concurrency_oauth = 2;
 const int max_retry_oauth = 5;
 
 const int max_concurrency_blob_wrapper = 20;
+
+#endif //CONSTANT_h

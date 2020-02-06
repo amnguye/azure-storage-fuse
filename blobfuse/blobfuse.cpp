@@ -23,6 +23,7 @@ struct options
     const char *container_name; //container to mount. Used only if config_file is not provided
     const char *log_level; // Sets the level at which the process should log to syslog.
     const char *use_attr_cache; // True if the cache for blob attributes should be used.
+    const char *use_adls; // True if the dfs/DataLake endpoint should be used when necessary
     const char *version; // print blobfuse version
     const char *help; // print blobfuse usage
 };
@@ -39,6 +40,7 @@ const struct fuse_opt option_spec[] =
     OPTION("--container-name=%s", container_name),
     OPTION("--log-level=%s", log_level),
     OPTION("--use-attr-cache=%s", use_attr_cache),
+    OPTION("--use-adls=%s", use_adls),
     OPTION("--version", version),
     OPTION("-v", version),
     OPTION("--help", help),
@@ -263,7 +265,22 @@ int read_config(const std::string configFile)
 
 void *azs_init(struct fuse_conn_info * conn)
 {
-    storage_client = std::make_shared<BlockBlobBfsClient>(str_options);
+    if (file_options.use_adls != NULL)
+    {
+        if (strcmp(file_options.use_adls, "true"))
+        {
+            storage_client = std::make_shared<DataLakeBfsClient>(str_options);
+        }
+        else
+        {
+            //TODO:There's probably a way to not have this and have it skip to the other else.. I'm forgetting though
+            storage_client = std::make_shared<BlockBlobBfsClient>(str_options);
+        }
+    }
+    else
+    {
+        storage_client = std::make_shared<BlockBlobBfsClient>(str_options);
+    }
     if(storage_client->AuthenticateStorage())
     {
         syslog(LOG_DEBUG, "Successfully Authenticated!");
@@ -305,7 +322,7 @@ void print_usage()
 
 void print_version()
 {
-    fprintf(stdout, "blobfuse 1.2.1\n");
+    fprintf(stdout, "blobfuse 1.2.2\n");
 }
 
 int set_log_mask(const char * min_log_level_char)

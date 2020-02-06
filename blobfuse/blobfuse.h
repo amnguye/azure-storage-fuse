@@ -21,6 +21,7 @@
 #include <syslog.h>
 #include "gc_cache.h"
 #include "BlockBlobBfsClient.h"
+#include "DataLakeBfsClient.h"
 
 // Declare that we're using version 2.9 of FUSE
 // 3.0 is not built-in to many distros yet.

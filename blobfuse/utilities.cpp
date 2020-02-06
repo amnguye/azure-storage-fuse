@@ -291,145 +291,6 @@ int azs_utimens(const char * /*path*/, const struct timespec [2] /*ts[2]*/)
 }
 //  #endif
 
-int azs_rename_directory(const char *src, const char *dst)
-{
-    AZS_DEBUGLOGV("azs_rename_directory called with src = %s, dst = %s.\n", src, dst);
-    std::string srcPathStr(src);
-    std::string dstPathStr(dst);
-
-    // Rename the directory blob, if it exists.
-    errno = 0;
-    if (storage_client->Exists(srcPathStr))
-    {
-        azs_rename_single_file(src, dst);
-    }
-    if (errno != 0)
-    {
-        if ((errno != 404) && (errno != ENOENT))
-        {
-            return 0 - map_errno(errno); // Failure in fetching properties - errno set by blob_exists
-        }
-    }
-
-    if (srcPathStr.size() > 1)
-    {
-        srcPathStr.push_back('/');
-    }
-    if (dstPathStr.size() > 1)
-    {
-        dstPathStr.push_back('/');
-    }
-    std::vector<std::string> local_list_results;
-
-    // Rename all files and directories that exist in the local cache.
-    ensure_files_directory_exists_in_cache(prepend_mnt_path_string(dstPathStr + "placeholder"));
-    std::string mntPathString = prepend_mnt_path_string(srcPathStr);
-    DIR *dir_stream = opendir(mntPathString.c_str());
-    if (dir_stream != NULL)
-    {
-        struct dirent* dir_ent = readdir(dir_stream);
-        while (dir_ent != NULL)
-        {
-            if (dir_ent->d_name[0] != '.')
-            {
-                int nameLen = strlen(dir_ent->d_name);
-                char *newSrc = (char *)malloc(sizeof(char) * (srcPathStr.size() + nameLen + 1));
-                memcpy(newSrc, srcPathStr.c_str(), srcPathStr.size());
-                memcpy(&(newSrc[srcPathStr.size()]), dir_ent->d_name, nameLen);
-                newSrc[srcPathStr.size() + nameLen] = '\0';
-
-                char *newDst = (char *)malloc(sizeof(char) * (dstPathStr.size() + nameLen + 1));
-                memcpy(newDst, dstPathStr.c_str(), dstPathStr.size());
-                memcpy(&(newDst[dstPathStr.size()]), dir_ent->d_name, nameLen);
-                newDst[dstPathStr.size() + nameLen] = '\0';
-
-                AZS_DEBUGLOGV("Local object found - about to rename %s to %s.\n", newSrc, newDst);
-                if (dir_ent->d_type == DT_DIR)
-                {
-                    azs_rename_directory(newSrc, newDst);
-                }
-                else
-                {
-                    azs_rename_single_file(newSrc, newDst);
-                }
-
-                free(newSrc);
-                free(newDst);
-
-                std::string dir_str(dir_ent->d_name);
-                local_list_results.push_back(dir_str);
-            }
-
-            dir_ent = readdir(dir_stream);
-        }
-
-        closedir(dir_stream);
-    }
-
-    // Rename all files & directories that don't exist in the local cache.
-    errno = 0;
-    std::vector<std::pair<std::vector<list_hierarchical_item>, bool>> listResults = storage_client->ListAllItemsHierarchical("/", srcPathStr.substr(1));
-    if (errno != 0)
-    {
-        int storage_errno = errno;
-        syslog(LOG_ERR, "list blobs operation failed during attempt to rename directory %s to %s.  errno = %d.\n", src, dst, storage_errno);
-        return 0 - map_errno(storage_errno);
-    }
-
-    AZS_DEBUGLOGV("Total of %s result lists found from list_blobs call during rename operation\n.", to_str(listResults.size()).c_str());
-    for (size_t result_lists_index = 0; result_lists_index < listResults.size(); result_lists_index++)
-    {
-        int start = listResults[result_lists_index].second ? 1 : 0;
-        for (size_t i = start; i < listResults[result_lists_index].first.size(); i++)
-        {
-            // We need to parse out just the trailing part of the path name.
-            int len = listResults[result_lists_index].first[i].name.size();
-            if (len > 0)
-            {
-                std::string prev_token_str;
-                if (listResults[result_lists_index].first[i].name.back() == '/')
-                {
-                    prev_token_str = listResults[result_lists_index].first[i].name.substr(srcPathStr.size() - 1, listResults[result_lists_index].first[i].name.size() - srcPathStr.size());
-                }
-                else
-                {
-                    prev_token_str = listResults[result_lists_index].first[i].name.substr(srcPathStr.size() - 1);
-                }
-
-                // TODO: order or hash the list to improve perf
-                if ((prev_token_str.size() > 0) && (std::find(local_list_results.begin(), local_list_results.end(), prev_token_str) == local_list_results.end()))
-                {
-                    int nameLen = prev_token_str.size();
-                    char *newSrc = (char *)malloc(sizeof(char) * (srcPathStr.size() + nameLen + 1));
-                    memcpy(newSrc, srcPathStr.c_str(), srcPathStr.size());
-                    memcpy(&(newSrc[srcPathStr.size()]), prev_token_str.c_str(), nameLen);
-                    newSrc[srcPathStr.size() + nameLen] = '\0';
-
-                    char *newDst = (char *)malloc(sizeof(char) * (dstPathStr.size() + nameLen + 1));
-                    memcpy(newDst, dstPathStr.c_str(), dstPathStr.size());
-                    memcpy(&(newDst[dstPathStr.size()]), prev_token_str.c_str(), nameLen);
-                    newDst[dstPathStr.size() + nameLen] = '\0';
-
-                    AZS_DEBUGLOGV("Object found on the service - about to rename %s to %s.\n", newSrc, newDst);
-                    if (listResults[result_lists_index].first[i].is_directory)
-                    {
-                        azs_rename_directory(newSrc, newDst);
-                    }
-                    else
-                    {
-                        azs_rename_single_file(newSrc, newDst);
-                    }
-
-                    free(newSrc);
-                    free(newDst);
-                }
-            }
-        }
-    }
-    azs_rmdir(src);
-    return 0;
-}
-
 // TODO: Fix bug where the files and directories in the source in the file cache are not deleted.
 // TODO: Fix bugs where the a file has been created but not yet uploaded.
 // TODO: Fix the bug where this fails for multi-level dirrectories.
@@ -438,23 +299,10 @@ int azs_rename(const char *src, const char *dst)
 {
     AZS_DEBUGLOGV("azs_rename called with src = %s, dst = %s.\n", src, dst);
 
-    struct stat statbuf;
     errno = 0;
-    int getattrret = azs_getattr(src, &statbuf);
-    if (getattrret != 0)
-    {
-        return getattrret;
-    }
-    if ((statbuf.st_mode & S_IFDIR) == S_IFDIR)
-    {
-        azs_rename_directory(src, dst);
-    }
-    else
-    {
-        azs_rename_single_file(src, dst);
-    }
+    storage_client->Rename(src,dst);
 
-    return 0;
+    return errno;
 }
 
 

@@ -1,6 +1,8 @@
 #include "StorageBfsClientBase.h"
 #include "blob/blob_client.h"
 
+#ifndef BLOCKBLOBBFSCLIENTBASE_H
+#define BLOCKBLOBBFSCLIENTBASE_H
 
 class BlockBlobBfsClient : public StorageBfsClientBase
 {
@@ -19,27 +21,27 @@ public:
     ///</summary>
     ///TODO: params
     ///<returns>none</returns>
-    void UploadFromFile(std::string sourcePath) override;
+    void UploadFromFile(const std::string sourcePath) override;
     ///<summary>
     /// Uploads contents of a stream to a block blob to the Storage service
     ///</summary>
     ///<returns>none</returns>
-    void UploadFromStream(std::istream & sourceStream, std::string blobName) override;
+    void UploadFromStream(std::istream & sourceStream, const std::string blobName) override;
     ///<summary>
     /// Downloads contents of a block blob to a local file
     ///</summary>
     ///<returns>none</returns>
-    void DownloadToFile(std::string blobName, std::string filePath) override;
+    void DownloadToFile(const std::string blobName, const std::string filePath) override;
     ///<summary>
     /// Creates a Directory
     ///</summary>
     ///<returns>none</returns>
-    bool CreateDirectory(const char * directoryPath) override;
+    bool CreateDirectory(const std::string directoryPath) override;
     ///<summary>
     /// Deletes a Directory
     ///</summary>
     ///<returns>none</returns>
-    bool DeleteDirectory(const char * directoryPath) override;
+    bool DeleteDirectory(const std::string directoryPath) override;
     ///<summary>
     /// Checks if the blob is a directory
     ///</summary>
@@ -48,7 +50,7 @@ public:
     ///<summary>
     /// Helper function - Checks if the "directory" blob is empty
     ///</summary>
-    D_RETURN_CODE IsDirectoryEmpty(const char * path) override;
+    D_RETURN_CODE IsDirectoryEmpty(std::string path) override;
     ///<summary>
     /// Deletes a File
     ///</summary>
@@ -89,11 +91,11 @@ private:
     ///<summary>
     /// Helper function - Renames single file
     ///</summary>
-    int rename_single_file(const char * src, const char * dst, std::vector<std::string> & files_to_remove_cache);
+    int rename_single_file(std::string src, std::string dst, std::vector<std::string> & files_to_remove_cache);
     ///<summary>
     /// Helper function - Renames directory
     ///</summary>
-    int rename_directory(const char * src, const char * dst, std::vector<std::string> & files_to_remove_cache);
+    int rename_directory(std::string src, std::string dst, std::vector<std::string> & files_to_remove_cache);
     ///<summary>
     /// Helper function - Ensures directory path exists in the cache
     /// TODO: refactoring, rename variables and add comments to make sense to parsing
@@ -103,8 +105,21 @@ private:
     /// Helper function - Authenticates with an account key
     ///</summary>
     std::shared_ptr<sync_blob_client> authenticate_accountkey();
+    ///<summary>
+    /// Helper function - Authenticates with an account sas
+    ///</summary>
     std::shared_ptr<sync_blob_client> authenticate_sas();
+    ///<summary>
+    /// Helper function - Authenticates with msi
+    ///</summary>
     std::shared_ptr<sync_blob_client> authenticate_msi();
-
+    ///<summary>
+    /// Helper function - Checks metadata hdi_isfolder aka if the blob marker is a folder
+    ///</summary>
+    bool is_folder(const std::vector<std::pair<std::string,std::string>> & metadata);
+    ///<summary>
+    /// Blob Client to make blob storage calls
+    ///</summary>
     std::shared_ptr<sync_blob_client> m_blob_client;
 };
+#endif //BLOCKBLOBBFSCLIENTBASE_H

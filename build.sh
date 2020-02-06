@@ -5,7 +5,7 @@ BLOBFS_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
 
 cmake_args='-DCMAKE_BUILD_TYPE=RelWithDebInfo ..'
 if [ -n "${INCLUDE_TESTS}" ]; then
-    cmake_args='-DCMAKE_BUILD_TYPE=RelWithDebInfo -DINCLUDE_TESTS=1 ..'
+    cmake_args='-DCMAKE_BUILD_TYPE=RelWithDebInfo..'
 fi
 
 ## install pkg-config, cmake, libcurl and libfuse first

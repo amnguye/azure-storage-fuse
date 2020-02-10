@@ -135,6 +135,8 @@ set(AZURE_STORAGE_SOURCE
   azure-storage-cpp-lite/adls/src/append_data_request.cpp
   azure-storage-cpp-lite/adls/src/flush_data_request.cpp
   azure-storage-cpp-lite/adls/src/rename_file_request.cpp
+  azure-storage-cpp-lite/adls/src/get_dfs_properties_request.cpp
+  azure-storage-cpp-lite/adls/include/get_dfs_properties_request.h
 )
 
 
@@ -147,7 +149,8 @@ set (BLOBFUSE_HEADER
   blobfuse/include/BlockBlobBfsClient.h
   blobfuse/include/file_lock_map.h
   blobfuse/include/gc_cache.h
-  blobfuse/include/DataLakeBfsClient.h)
+  blobfuse/include/DataLakeBfsClient.h
+  blobfuse/include/permissions.h)
 
 set (BLOBFUSE_SOURCE
 #  blobfuse/blobfuse.cpp    # We don't include blobfuse.cpp because the file contents are directly #included in main.cpp.  This allows us to split main() and everything
@@ -163,7 +166,8 @@ set (BLOBFUSE_SOURCE
   blobfuse/src/StorageBfsClientBase.cpp
   blobfuse/src/BlockBlobBfsClient.cpp
   blobfuse/src/file_lock_map.cpp blobfuse/src/gc_cache.cpp
-  blobfuse/src/DataLakeBfsClient.cpp)
+  blobfuse/src/DataLakeBfsClient.cpp
+  blobfuse/src/permissions.cpp)
 
 if(UNIX)
   project(blobfuse)

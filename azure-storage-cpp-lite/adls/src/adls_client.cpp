@@ -133,13 +133,17 @@ namespace microsoft_azure { namespace storage_adls {
         return blob_client_adaptor<void>(async_func);
     }
 
-    void adls_client::delete_directory(const std::string& filesystem, const std::string& directory)
+    void adls_client::delete_directory(const std::string& filesystem, const std::string& directory, bool recursive)
     {
         auto http = m_blob_client->client()->get_handle();
         std::string continuation;
         while (true)
         {
-            auto request = std::make_shared<delete_directory_request>(filesystem, directory, continuation);
+            auto request = std::make_shared<delete_directory_request>(
+                    filesystem,
+                    directory,
+                    recursive ? "true" : "false",
+                    continuation);
             auto async_func = std::bind(&microsoft_azure::storage::async_executor<void>::submit, m_account, request, http, m_context);
             blob_client_adaptor<void>(async_func);
             if (!success())

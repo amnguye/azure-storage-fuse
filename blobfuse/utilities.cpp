@@ -108,7 +108,8 @@ int ensure_files_directory_exists_in_cache(const std::string& file_path)
     return status;
 }
 
-int azs_getattr(const char *path, struct stat *stbuf)
+int
+(const char *path, struct stat *stbuf)
 {
     AZS_DEBUGLOGV("azs_getattr called with path = %s\n", path);
     // If we're at the root, we know it's a directory
@@ -189,7 +190,7 @@ int azs_getattr(const char *path, struct stat *stbuf)
         // Check to see if it's a directory, instead of a file
 
         errno = 0;
-        int dirSize = storage_client->IsDirectory(blobNameStr.c_str());
+        int dirSize = is_directory_blob();
         if (errno != 0)
         {
             int storage_errno = errno;

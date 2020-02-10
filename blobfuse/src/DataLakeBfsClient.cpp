@@ -1,5 +1,6 @@
 #include <fstream>
 #include "DataLakeBfsClient.h"
+#include "list_paths_request.h"
 
 ///<summary>
 /// Uploads contents of a file to a storage object(e.g. blob, file) to the Storage service
@@ -108,10 +109,8 @@ std::shared_ptr<microsoft_azure::storage_adls::adls_client> DataLakeBfsClient::a
         return NULL;
     }
 }
-std::shared_ptr<microsoft_azure::storage_adls::adls_client> DataLakeBfsClient::authenticate_msi()
-{
-    try
-    {
+std::shared_ptr<microsoft_azure::storage_adls::adls_client> DataLakeBfsClient::authenticate_msi() {
+    try {
         //1. get oauth token
         std::function<OAuthToken(std::shared_ptr<CurlEasyClient>)> MSICallback = SetUpMSICallback(
                 configurations.clientId,
@@ -124,6 +123,7 @@ std::shared_ptr<microsoft_azure::storage_adls::adls_client> DataLakeBfsClient::a
         if (!tokenManager->is_valid_connection()) {
             // todo: isolate definitions of errno's for this function so we can output something meaningful.
             errno = 1;
+            return NULL;
         }
 
         //2. try to make blob client wrapper using oauth token
@@ -138,40 +138,120 @@ std::shared_ptr<microsoft_azure::storage_adls::adls_client> DataLakeBfsClient::a
                 account,
                 max_concurrency_blob_wrapper,
                 false); //If this applies to blobs in the future, we can use this as a feature to exit
-                                // blobfuse if we run into anything unexpected instead of logging errors
+        // blobfuse if we run into anything unexpected instead of logging errors
 
     }
-    catch(const std::exception &ex)
-    {
-        syslog(LOG_ERR, "Failed to create blob client.  ex.what() = %s. Please check your account name and ", ex.what());
+    catch (const std::exception &ex) {
+        syslog(LOG_ERR, "Failed to create blob client.  ex.what() = %s. Please check your account name and ",
+               ex.what());
         errno = unknown_error;
         return NULL;
     }
 }
+///<summary>
+/// Creates a Directory
+///</summary>
+///<returns>none</returns>
+bool DataLakeBfsClient::CreateDirectory(const std::string directoryPath)
+{
+    // We could call the block blob CreateDirectory instead but that would require making the metadata with hdi_isfolder
+    // it's easier if we let the service do that for us
+    errno = 0;
+    m_adls_client->create_directory(configurations.containerName, directoryPath);
+    if(errno != 0)
+    {
+        return false;
+    }
+    return true;
+}
+///<summary>
+/// Deletes a Directory
+///</summary>
+///<returns>none</returns>
+bool DataLakeBfsClient::DeleteDirectory(const std::string directoryPath)
+{
+    errno = 0;
+    m_adls_client->delete_directory(configurations.containerName, directoryPath, false);
+    if(errno != 0)
+    {
+        return false;
+    }
+    return true;
+}
 
-void DataLakeBfsClient::UploadFromFile(const std::string localPath)
-{
-    //TODO: streams can only hold so much of the file. We should be taking it a section at a time
-    //refer to blob upload from file method
-    std::string dataLakeFileName = localPath.substr(configurations.tmpPath.size() + 6 /* there are six characters in "/root/" */);
-    std::ifstream file_stream(localPath);
-    UploadFromStream(file_stream,dataLakeFileName);
-}
 ///<summary>
-/// Uploads contents of a stream to a storage object(e.g. blob, file) to the Storage service
+/// Helper function - Checks if the "directory" blob is empty
 ///</summary>
-///<returns>none</returns>
-void DataLakeBfsClient::UploadFromStream(std::istream & sourceStream, const std::string datalakeFilePath)
+D_RETURN_CODE DataLakeBfsClient::IsDirectoryEmpty(std::string path)
 {
-    m_adls_client->upload_file_from_stream(configurations.containerName, datalakeFilePath, sourceStream);
+    bool success = false;
+    bool old_dir_blob_found = false;
+    int failcount = 0;
+    std::string continuation = "";
+    do{
+        errno = 0;
+        microsoft_azure::storage_adls::list_paths_result pathsResult = m_adls_client->list_paths_segmented(
+                configurations.containerName,
+                path,
+                false,
+                std::string(),
+                2);
+        if(errno == 0)
+        {
+            success = true;
+            failcount = 0;
+            continuation = pathsResult.continuation_token;
+            if (pathsResult.paths.size() > 1) {
+                return D_NOTEMPTY;
+            }
+            if (pathsResult.paths.size() > 0)
+            {
+                // A blob of the previous folder ".." could still exist, that does not count as the directory still has
+                // any existing blobs
+                if ((!old_dir_blob_found) &&
+                    (!pathsResult.paths[0].is_directory) &&
+                    (pathsResult.paths[0].name.size() > former_directory_signifier.size()) &&
+                    (0 == pathsResult.paths[0].name.compare(
+                            pathsResult.paths[0].name.size() - former_directory_signifier.size(),
+                             former_directory_signifier.size(),
+                             former_directory_signifier)))
+                {
+                    old_dir_blob_found = true;
+                } else
+                    {
+                    return D_NOTEMPTY;
+                }
+            }
+        }
+        else
+        {
+            success = false;
+            failcount++;
+        }
+    }
+    // If we get a continuation token, and the blob size on the first or so calls is still empty, the service could
+    // actually have blobs in the container, but they just didn't send them in the request, but they have a
+    // continuation token so it means they could have some.
+    while ((continuation.size() > 0 || !success) && failcount < 20);
+
+    if(!success)
+    {
+        return D_FAILED;
+    }
+    return old_dir_blob_found ? D_EMPTY : D_NOTEMPTY;
 }
+
 ///<summary>
-/// Downloads contents of a storage object(e.g. blob, file) to a local file
+/// Renames a file/directory
 ///</summary>
-///<returns>none</returns>
-void DataLakeBfsClient::DownloadToFile(const std::string datalakeFilePath, const std::string filePath)
+///<returns></returns>
+std::vector<std::string> DataLakeBfsClient::Rename(std::string sourcePath, std::string destinationPath)
 {
-    std::ofstream out_stream(filePath);
-    m_adls_client->download_file_to_stream(configurations.containerName, datalakeFilePath, out_stream);
-    out_stream.close();
+    m_adls_client->move_file(
+            configurations.containerName,
+            sourcePath,
+            configurations.containerName,
+            destinationPath);
+    //stub for now
+    return std::vector<std::string>();
 }

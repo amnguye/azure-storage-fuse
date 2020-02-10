@@ -13,7 +13,7 @@ namespace microsoft_azure { namespace storage_adls {
 
         storage_url url = account.get_url(storage_account::service::adls);
         url.append_path(m_filesystem).append_path(m_directory);
-        url.add_query(constants::query_recursive, "true");
+        url.add_query(constants::query_recursive, m_recursive);
         add_optional_query(url, constants::query_continuation, m_continuation);
 
         http.set_url(url.to_string());

@@ -162,7 +162,8 @@ set (BLOBFUSE_SOURCE
   blobfuse/OAuthTokenCredentialManager.cpp
   blobfuse/src/StorageBfsClientBase.cpp
   blobfuse/src/BlockBlobBfsClient.cpp
-  blobfuse/src/file_lock_map.cpp blobfuse/src/gc_cache.cpp
+  blobfuse/src/file_lock_map.cpp
+  blobfuse/src/gc_cache.cpp
   blobfuse/src/DataLakeBfsClient.cpp)
 
 if(UNIX)
@@ -208,8 +209,8 @@ if(UNIX)
   set(CPACK_GENERATOR "DEB")
   set(CPACK_DEBIAN_PACKAGE_MAINTAINER "Microsoft - Azure Storage")
   set(CPACK_DEBIAN_PACKAGE_DEPENDS "fuse")
-  set(CPACK_DEBIAN_PACKAGE_DESCRIPTION "blobfuse 1.2.1 - FUSE adapter for Azure Blob Storage")
-  set(VERSION "1.2.1")
+  set(CPACK_DEBIAN_PACKAGE_DESCRIPTION "blobfuse 1.2.2 - FUSE adapter for Azure Blob Storage")
+  set(VERSION "1.2.2")
   set(CPACK_PACKAGE_VERSION_MAJOR 1)
   set(CPACK_PACKAGE_VERSION_MINOR 2)
   set(CPACK_PACKAGE_VERSION_RELEASE 1)
@@ -217,56 +218,3 @@ if(UNIX)
   set(CPACK_PACKAGE_VENDOR "Microsoft")
   include(CPack)
 endif(UNIX)
-
-
-
-if(INCLUDE_TESTS)
-  # Download and build googletest at cmake time, as recommended by the googletest docs:
-  # https://github.com/google/googletest/blob/master/googletest/README.md
-
-  # Download and unpack googletest at configure time
-  configure_file(test/CMakeLists.txt.in googletest-download/CMakeLists.txt)
-  execute_process(COMMAND ${CMAKE_COMMAND} -G "${CMAKE_GENERATOR}" .
-    RESULT_VARIABLE result
-    WORKING_DIRECTORY ${CMAKE_BINARY_DIR}/googletest-download )
-  if(result)
-    message(FATAL_ERROR "CMake step for googletest failed: ${result}")
-  endif()
-  execute_process(COMMAND ${CMAKE_COMMAND} --build .
-    RESULT_VARIABLE result
-    WORKING_DIRECTORY ${CMAKE_BINARY_DIR}/googletest-download )
-  if(result)
-    message(FATAL_ERROR "Build step for googletest failed: ${result}")
-  endif()
-
-  # Prevent overriding the parent project's compiler/linker
-  # settings on Windows
-  set(gtest_force_shared_crt ON CACHE BOOL "" FORCE)
-
-  # Add googletest directly to our build. This defines
-  # the gtest and gtest_main targets.
-  add_subdirectory(${CMAKE_BINARY_DIR}/googletest-src
-                   ${CMAKE_BINARY_DIR}/googletest-build
-                   EXCLUDE_FROM_ALL)
-
-  # The gtest/gtest_main targets carry header search path
-  # dependencies automatically when using CMake 2.8.11 or
-  # later. Otherwise we have to add them here ourselves.
-  if (CMAKE_VERSION VERSION_LESS 2.8.11)
-    include_directories("${gtest_SOURCE_DIR}/include")
-  endif()
-
-
-
-  project(blobfusetests)
-  find_package(Boost REQUIRED)
-  set(Boost_USE_STATIC_LIBS ON)
-  find_package(Boost COMPONENTS filesystem system REQUIRED)
-  find_package(Boost COMPONENTS thread REQUIRED)
-  add_definitions(-std=c++11)
-  pkg_search_module(UUID REQUIRED uuid)
-  include_directories(${Boost_INCLUDE_DIR})
-  add_executable(blobfusetests ${BLOBFUSE_HEADER} ${BLOBFUSE_SOURCE} ${AZURE_STORAGE_HEADER} ${AZURE_STORAGE_SOURCE} ${AZURE_STORAGE_ADLS_SOURCES} blobfuse/blobfuse.cpp test/cpplitetests.cpp test/attribcachetests.cpp test/attribcachesynchronizationtests.cpp)
-  target_link_libraries(blobfusetests ${CURL_LIBRARIES} ${GNUTLS_LIBRARIES} ${CMAKE_THREAD_LIBS_INIT} ${UUID_LIBRARIES} ${Boost_FILESYSTEM_LIBRARY} ${Boost_SYSTEM_LIBRARY} ${Boost_THREAD_LIBRARY} fuse gcrypt gmock_main)
-
-endif()

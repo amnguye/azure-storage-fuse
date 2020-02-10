@@ -9,7 +9,8 @@ class DataLakeBfsClient : public BlockBlobBfsClient
 {
 public:
     DataLakeBfsClient(str_options str_options) :
-    BlockBlobBfsClient(str_options)
+    BlockBlobBfsClient(str_options),
+    m_adls_client(NULL)
     {}
     ///<summary>
     /// Authenticates the storage account and container
@@ -17,21 +18,24 @@ public:
     ///<returns>bool: if we authenticate to the storage account and container successfully</returns>
     bool AuthenticateStorage() override;
     ///<summary>
-    /// Uploads contents of a file to a storage object(e.g. blob, file) to the Storage service
+    /// Creates a Directory
     ///</summary>
-    ///TODO: params
     ///<returns>none</returns>
-    void UploadFromFile(const std::string localPath) override;
+    bool CreateDirectory(const std::string directoryPath) override;
     ///<summary>
-    /// Uploads contents of a stream to a storage object(e.g. blob, file) to the Storage service
+    /// Deletes a Directory
     ///</summary>
     ///<returns>none</returns>
-    void UploadFromStream(std::istream & sourceStream, const std::string datalakeFilePath) override;
+    bool DeleteDirectory(const std::string directoryPath) override;
     ///<summary>
-    /// Downloads contents of a storage object(e.g. blob, file) to a local file
+    /// Helper function - Checks if the "directory" blob is empty
+    ///</summary>
+    D_RETURN_CODE IsDirectoryEmpty(std::string path) override;
+    ///<summary>
+    /// Renames a DataLake file
     ///</summary>
     ///<returns>none</returns>
-    void DownloadToFile(const std::string datalakeFilePath, const std::string filePath) override;
+    std::vector<std::string> Rename(std::string sourcePath, std::string destinationPath) override;
 private:
     ///<summary>
     /// Helper function - Authenticates with an account key

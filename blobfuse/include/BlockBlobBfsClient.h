@@ -8,7 +8,8 @@ class BlockBlobBfsClient : public StorageBfsClientBase
 {
 public:
     BlockBlobBfsClient(str_options str_options) :
-    StorageBfsClientBase(str_options)
+    StorageBfsClientBase(str_options),
+    m_blob_client(NULL)
     {}
 
     ///<summary>

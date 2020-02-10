@@ -114,7 +114,7 @@ namespace microsoft_azure { namespace storage_adls {
         /// </summary>
         /// <param name="filesystem">The filesystem name.</param>
         /// <param name="directory">The directory path.</param>
-        AZURE_STORAGE_ADLS_API void delete_directory(const std::string& filesystem, const std::string& directory);
+        AZURE_STORAGE_ADLS_API void delete_directory(const std::string& filesystem, const std::string& directory, bool recursive);
 
         /// <summary>
         /// Returns whether a directory already exists.

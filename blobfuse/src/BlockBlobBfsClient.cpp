@@ -46,6 +46,7 @@ bool BlockBlobBfsClient::AuthenticateStorage()
 
 std::shared_ptr<sync_blob_client> BlockBlobBfsClient::authenticate_accountkey()
 {
+    syslog(LOG_DEBUG, "Authenticating using account key");
     try
     {
         std::shared_ptr<storage_credential> cred;
@@ -81,6 +82,7 @@ std::shared_ptr<sync_blob_client> BlockBlobBfsClient::authenticate_accountkey()
 }
 std::shared_ptr<sync_blob_client> BlockBlobBfsClient::authenticate_sas()
 {
+    syslog(LOG_DEBUG, "Authenticating using SAS");
     try
     {
         std::shared_ptr<storage_credential> cred;
@@ -115,6 +117,7 @@ std::shared_ptr<sync_blob_client> BlockBlobBfsClient::authenticate_sas()
 }
 std::shared_ptr<sync_blob_client> BlockBlobBfsClient::authenticate_msi()
 {
+    syslog(LOG_DEBUG, "Authenticating using MSI");
     try
     {
         //1. get oauth token
@@ -129,6 +132,7 @@ std::shared_ptr<sync_blob_client> BlockBlobBfsClient::authenticate_msi()
         if (!tokenManager->is_valid_connection()) {
             // todo: isolate definitions of errno's for this function so we can output something meaningful.
             errno = 1;
+            return std::make_shared<blob_client_wrapper>(false);
         }
 
         //2. try to make blob client wrapper using oauth token
@@ -428,6 +432,8 @@ D_RETURN_CODE BlockBlobBfsClient::IsDirectoryEmpty(std::string path)
             }
             if (response.blobs.size() > 0)
             {
+                // A blob of the previous folder ".." could still exist, that does not count as the directory still has
+                // any existing blobs
                 if ((!old_dir_blob_found) &&
                     (!response.blobs[0].is_directory) &&
                     (response.blobs[0].name.size() > former_directory_signifier.size()) &&
@@ -446,6 +452,9 @@ D_RETURN_CODE BlockBlobBfsClient::IsDirectoryEmpty(std::string path)
             success = false;
             failcount++; //TODO: use to set errno.
         }
+        // If we get a continuation token, and the blob size on the first or so calls is still empty, the service could
+        // actually have blobs in the container, but they just didn't send them in the request, but they have a
+        // continuation token so it means they could have some.
     } while ((continuation.size() > 0 || !success) && failcount < 20);
 
     if (!success)

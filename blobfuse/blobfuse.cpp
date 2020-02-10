@@ -72,7 +72,7 @@ std::string to_lower(std::string original) {
     return out;
 }
 
-AUTH_TYPE get_auth_type(std::string authStr) {
+AUTH_TYPE get_auth_type(std::string authStr = "") {
 
     if(!authStr.empty()) {
         std::string lcAuthType = to_lower(authStr);
@@ -149,10 +149,7 @@ int read_config_env()
             str_options.msiEndpoint = env_managed_identity_endpoint;
         }
 
-        if(env_auth_type)
-        {
-            str_options.authType = get_auth_type(env_auth_type);
-        }
+        str_options.authType = get_auth_type(env_auth_type);
 
         if(env_blob_endpoint) {
             // Optional to specify blob endpoint
@@ -184,6 +181,7 @@ int read_config(const std::string configFile)
 
     std::string line;
     std::istringstream data;
+    bool set_auth_type = false;
 
     while(std::getline(file, line))
     {
@@ -234,6 +232,7 @@ int read_config(const std::string configFile)
         else if(line.find("authType") != std::string::npos)
         {
             str_options.authType = get_auth_type(value);
+            set_auth_type = true;
         }
         else if(line.find("msiEndpoint") != std::string::npos)
         {
@@ -242,6 +241,11 @@ int read_config(const std::string configFile)
         }
 
         data.clear();
+    }
+
+    if(!set_auth_type)
+    {
+        str_options.authType = get_auth_type();
     }
 
     if(str_options.accountName.empty())
@@ -265,20 +269,24 @@ int read_config(const std::string configFile)
 
 void *azs_init(struct fuse_conn_info * conn)
 {
+
     if (file_options.use_adls != NULL)
     {
+        syslog(LOG_DEBUG, "Initializing blobfuse using DataLake");
         if (strcmp(file_options.use_adls, "true"))
         {
             storage_client = std::make_shared<DataLakeBfsClient>(str_options);
         }
         else
         {
+            syslog(LOG_DEBUG, "Initializing blobfuse using block blobs");
             //TODO:There's probably a way to not have this and have it skip to the other else.. I'm forgetting though
             storage_client = std::make_shared<BlockBlobBfsClient>(str_options);
         }
     }
     else
     {
+        syslog(LOG_DEBUG, "Initializing blobfuse using block blobs");
         storage_client = std::make_shared<BlockBlobBfsClient>(str_options);
     }
     if(storage_client->AuthenticateStorage())

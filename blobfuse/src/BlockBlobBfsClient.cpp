@@ -290,6 +290,7 @@ BfsFileProperty BlockBlobBfsClient::GetProperties(std::string pathName)
             property.copy_status,
             property.metadata,
             property.last_modified,
+            "", // Return an empty modestring because blob doesn't support file mode bits.
             property.size);
     return ret_property;
 }
@@ -873,4 +874,8 @@ bool BlockBlobBfsClient::is_folder(const std::vector<std::pair<std::string,std::
         }
     }
     return false;
+}
+
+int BlockBlobBfsClient::ChangeMode(const char*, mode_t) {
+    return -ENOSYS;
 }

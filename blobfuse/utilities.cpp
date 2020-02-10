@@ -108,8 +108,7 @@ int ensure_files_directory_exists_in_cache(const std::string& file_path)
     return status;
 }
 
-int
-(const char *path, struct stat *stbuf)
+int azs_getattr(const char *path, struct stat *stbuf)
 {
     AZS_DEBUGLOGV("azs_getattr called with path = %s\n", path);
     // If we're at the root, we know it's a directory
@@ -134,7 +133,7 @@ int
 
     int res;
     int acc = access(mntPathString.c_str(), F_OK);
-    if (acc != -1 )
+    if (acc != -1)
     {
         AZS_DEBUGLOGV("Accessing mntPath = %s for get_attr succeeded; object is in the local cache.\n", mntPathString.c_str());
         //(void) fi;
@@ -160,13 +159,14 @@ int
     std::string blobNameStr(&(path[1]));
     errno = 0;
     BfsFileProperty blob_property = storage_client->GetProperties(blobNameStr);
+    mode_t perms = blob_property.m_file_mode == 0 ? str_options.defaultPermission : blob_property.m_file_mode;
 
     if ((errno == 0) && blob_property.isValid())
     {
         if (is_directory_blob(blob_property.size(), blob_property.m_metadata))
         {
             AZS_DEBUGLOGV("Blob %s, representing a directory, found during get_attr.\n", path);
-            stbuf->st_mode = S_IFDIR | str_options.defaultPermission;
+            stbuf->st_mode = S_IFDIR | perms;
             // If st_nlink = 2, means directory is empty.
             // Directory size will affect behaviour for mv, rmdir, cp etc.
             stbuf->st_uid = fuse_get_context()->uid;
@@ -177,7 +177,7 @@ int
         }
 
         AZS_DEBUGLOGV("Blob %s, representing a file, found during get_attr.\n", path);
-        stbuf->st_mode = S_IFREG | str_options.defaultPermission; // Regular file (not a directory)
+        stbuf->st_mode = S_IFREG | perms; // Regular file (not a directory)
         stbuf->st_uid = fuse_get_context()->uid;
         stbuf->st_gid = fuse_get_context()->gid;
         stbuf->st_mtime = blob_property.last_modified();
@@ -190,7 +190,7 @@ int
         // Check to see if it's a directory, instead of a file
 
         errno = 0;
-        int dirSize = is_directory_blob();
+        int dirSize = is_directory_blob(blob_property.size(), blob_property.m_metadata);
         if (errno != 0)
         {
             int storage_errno = errno;
@@ -275,12 +275,14 @@ int azs_chown(const char * /*path*/, uid_t /*uid*/, gid_t /*gid*/)
     return 0;
 }
 
-int azs_chmod(const char * /*path*/, mode_t /*mode*/)
+int azs_chmod(const char * path, mode_t mode)
 {
-    //TODO: Implement
-//    return -ENOSYS;
-    return 0;
+    AZS_DEBUGLOGV("azs_chmod called with path = %s, mode = %o.\n", path, mode);
 
+    errno = 0;
+    storage_client->ChangeMode(path, mode);
+
+    return errno;
 }
 
 //#ifdef HAVE_UTIMENSAT

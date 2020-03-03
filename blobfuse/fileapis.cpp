@@ -191,7 +191,7 @@ int azs_create(const char *path, mode_t mode, struct fuse_file_info *fi)
     res = open(mntPath, fi->flags | O_EXCL, str_options.defaultPermission);
     if (res == -1)
     {
-        syslog(LOG_ERR, "Failure to open cache file %s in azs_open.  errno = %d\n.", path, errno);
+        syslog(LOG_ERR, "Failure to open cache file %s in azs_create.  errno = %d\n.", path, errno);
         return -errno;
     }
 
@@ -203,9 +203,10 @@ int azs_create(const char *path, mode_t mode, struct fuse_file_info *fi)
     }
 
     struct fhwrapper *fhwrap = new fhwrapper(res, true);
-    fi->fh = (long unsigned int)fhwrap;
+    fi->fh = (long unsigned int) fhwrap;
     syslog(LOG_INFO, "Successfully created file %s in file cache.\n", path);
     AZS_DEBUGLOGV("Returning success from azs_create with file %s.\n", path);
+
     return 0;
 }
 

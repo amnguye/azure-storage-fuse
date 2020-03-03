@@ -783,16 +783,18 @@ namespace microsoft_azure {
 
             try
             {
-                auto result = m_blobClient->get_blob_properties(container, blob);
-                if(!result.get().success())
+                std::future<storage_outcome<blob_property>> result = m_blobClient->get_blob_properties(container, blob);
+                result.wait();
+                storage_outcome<blob_property> outcome = result.get();
+                if(!outcome.success())
                 {
-                    errno = std::stoi(result.get().error().code);
+                    errno = std::stoi(outcome.error().code);
                     return blob_property(false);
                 }
                 else
                 {
                     errno = 0;
-                    return result.get().response();
+                    return outcome.response();
                 }
             }
             catch(std::exception& ex)

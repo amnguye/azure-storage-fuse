@@ -111,7 +111,7 @@ int initialize_blobfuse();
  * @return       TODO: Error codes
  */
 int azs_getattr(const char *path, struct stat *stbuf);
-
+int azs_fgetattr(const char *path, struct stat* stbuf, fuse_file_info* fi);
 /**
 * statfs gets the file system statistics for the tmpPath/local cache path
 *
@@ -146,6 +146,15 @@ int azs_mkdir(const char *path, mode_t mode);
  */
 int azs_readdir(const char *path, void *buf, fuse_fill_dir_t filler, off_t offset, struct fuse_file_info *fi);
 
+/**
+ * Opens a folder for reading
+ * TODO: talk about implementation
+ *
+ * @param path The path to the folder to open
+ * @parm fi File info. Contains the flags to use in opendir()
+ * @return error code (0 if success)
+ */
+int azs_opendir(const char * path, struct fuse_file_info* fi);
 
 /**
  * Open an item (a file) for writing or reading.
@@ -218,6 +227,17 @@ int azs_flush(const char *path, struct fuse_file_info *fi);
 int azs_release(const char *path, struct fuse_file_info * fi);
 
 /**
+ * Release directory
+ *
+ * No calls to storage, just releases locks and closes directory handle
+ *
+ * @param path Path to directory to release.
+ * @param fi Directory info, contains fh pointer. Data malloc'd in open/create and stored in fh should be free'd in here.
+ * @return Error code
+ */
+int azs_releasedir(const char* path, struct fuse_file_info *fi);
+
+/**
  * Unlink a file
  *
  * Delete the file from the local file cache (if present), and from Azure Storage (if present.)
@@ -280,6 +300,22 @@ int azs_chmod(const char *path, mode_t mode);
 int azs_utimens(const char *path, const struct timespec ts[2]);
 int azs_truncate(const char *path, off_t off);
 int azs_setxattr(const char *path, const char *name, const char *value, size_t size, int flags);
+int azs_getdir(const char* path, fuse_dirh_t dirh_t, fuse_dirfil_t dirfil_t);
+int azs_mknod(const char* path, mode_t mode, dev_t rdev);
+int azs_symlink(const char* linkname, const char* name);
+int azs_link(const char* oldpath, const char* newpath);
+int azs_utime(const char* path, utimbuf* tim);
+int azs_fsyncdir(const char* path, int datasync ,struct fuse_file_info * fi);
+int azs_ftruncate(const char* path, off_t off, struct fuse_file_info *fi);
+int azs_bmap(const char* path, size_t blocksize, uint64_t* idx);
+int azs_ioctl(const char* path, int cmd, void * arg, fuse_file_info * fi, unsigned int flags, void* data);
+int azs_poll(const char * path, struct fuse_file_info * fi, struct fuse_pollhandle * ph, unsigned int *reventsp);
+int azs_write_buf(const char * path, struct fuse_bufvec * buf, off_t off, struct fuse_file_info * fi);
+int azs_read_buf(const char * path, struct fuse_bufvec ** buf, size_t size, off_t off, struct fuse_file_info * fi);
+int azs_flock(const char * path, struct fuse_file_info * fi, int op);
+int azs_fallocate(const char * path, int mode, off_t off, off_t length, struct fuse_file_info * fi);
+int azs_lock(const char * path, struct fuse_file_info * fi, int cmd, struct flock* locks);
+
 
 /** Not implemented. */
 int azs_getxattr(const char *path, const char *name, char *value, size_t size);

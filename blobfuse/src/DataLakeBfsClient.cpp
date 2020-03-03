@@ -269,7 +269,8 @@ int DataLakeBfsClient::ChangeMode(const char *path, mode_t mode) {
 }
 
 BfsFileProperty DataLakeBfsClient::GetProperties(std::string pathName) {
-    auto dfsprops = m_adls_client->get_dfs_path_properties(configurations.containerName, pathName);
+    microsoft_azure::storage_adls::dfs_properties dfsprops =
+            m_adls_client->get_dfs_path_properties(configurations.containerName, pathName);
 
     return BfsFileProperty(
             dfsprops.cache_control,

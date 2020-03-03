@@ -269,7 +269,7 @@ int read_config(const std::string configFile)
 
 void *azs_init(struct fuse_conn_info * conn)
 {
-
+    syslog(LOG_DEBUG, "azs_init ran");
     if (file_options.use_adls != NULL)
     {
         syslog(LOG_DEBUG, "Initializing blobfuse using DataLake");
@@ -391,13 +391,16 @@ void set_up_callbacks(fuse_operations &azs_blob_operations)
     // Here, we set up all the callbacks that FUSE requires.
     azs_blob_operations.init = azs_init;
     azs_blob_operations.getattr = azs_getattr;
+    azs_blob_operations.fgetattr = azs_fgetattr;
     azs_blob_operations.statfs = azs_statfs;
     azs_blob_operations.access = azs_access;
     azs_blob_operations.readlink = azs_readlink;
     azs_blob_operations.readdir = azs_readdir;
     azs_blob_operations.open = azs_open;
+    azs_blob_operations.opendir = azs_opendir;
     azs_blob_operations.read = azs_read;
     azs_blob_operations.release = azs_release;
+    azs_blob_operations.releasedir = azs_releasedir;
     azs_blob_operations.fsync = azs_fsync;
     azs_blob_operations.create = azs_create;
     azs_blob_operations.write = azs_write;
@@ -406,6 +409,7 @@ void set_up_callbacks(fuse_operations &azs_blob_operations)
     azs_blob_operations.rmdir = azs_rmdir;
     azs_blob_operations.chown = azs_chown;
     azs_blob_operations.chmod = azs_chmod;
+    azs_blob_operations.flush = azs_flush;
     //#ifdef HAVE_UTIMENSAT
     azs_blob_operations.utimens = azs_utimens;
     //#endif
@@ -416,7 +420,24 @@ void set_up_callbacks(fuse_operations &azs_blob_operations)
     azs_blob_operations.getxattr = azs_getxattr;
     azs_blob_operations.listxattr = azs_listxattr;
     azs_blob_operations.removexattr = azs_removexattr;
-    azs_blob_operations.flush = azs_flush;
+    azs_blob_operations.getdir = azs_getdir;
+    azs_blob_operations.mknod = azs_mknod;
+    azs_blob_operations.symlink = azs_symlink;
+    azs_blob_operations.link = azs_link;
+    azs_blob_operations.utime = azs_utime;
+    azs_blob_operations.fsyncdir = azs_fsyncdir;
+    azs_blob_operations.ftruncate = azs_ftruncate;
+    azs_blob_operations.bmap = azs_bmap;
+    azs_blob_operations.ioctl = azs_ioctl;
+    azs_blob_operations.poll = azs_poll;
+    azs_blob_operations.write_buf = azs_write_buf;
+    azs_blob_operations.read_buf = azs_read_buf;
+    azs_blob_operations.flock = azs_flock;
+    azs_blob_operations.fallocate = azs_fallocate;
+    azs_blob_operations.lock = azs_lock;
+
+    azs_blob_operations.flag_nullpath_ok = 1;
+    azs_blob_operations.flag_utime_omit_ok = 0;
 }
 
 int read_and_set_arguments(int argc, char *argv[], struct fuse_args *args)

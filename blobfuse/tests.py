@@ -22,6 +22,9 @@ READ ME BEFORE RUNNING TESTS
 4. Change line 31 (variable cachedir) to the designated cache directory used by blobfuse
 Make sure your user has permissions to these folders you've designated and that the folders also
 allow to be accessed by the tests (use chown and/or chmod)
+Also sometimes the tests will run not by the user who started the process so add the "-o allow other" flag to your
+mount command. You may also need to alter the /etc/fuse.conf file. Allow your user to edit the fuse.conf file to allow
+other users to access the mounted point.
 HOW TO RUN TESTS:
 $ python ./tests.py 
 (or replace 'tests.py' with the python test name)

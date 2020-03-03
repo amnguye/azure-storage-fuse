@@ -196,7 +196,6 @@ void BlockBlobBfsClient::DownloadToFile(const std::string blobName, const std::s
 ///<returns>none</returns>
 bool BlockBlobBfsClient::CreateDirectory(const std::string directoryPath)
 {
-    std::string directoryPathStr;
     // There's no such thing as a "blob directory". We need to make a blob marker to represent that a directory exists
     // The blob marker is an empty blob with the metadata containing "hdi_isfolder=true"
     std::istringstream emptyDataStream("");
@@ -206,7 +205,7 @@ bool BlockBlobBfsClient::CreateDirectory(const std::string directoryPath)
 
     m_blob_client->upload_block_blob_from_stream(
             configurations.containerName,
-            directoryPathStr.substr(1),
+            directoryPath,
             emptyDataStream,
             metadata);
 
@@ -240,27 +239,47 @@ bool BlockBlobBfsClient::DeleteDirectory(const std::string directoryPath)
     errno = 0;
     D_RETURN_CODE dir_blob_exists = IsDirectoryEmpty(directoryPath);
 
-    if (errno != 0)
+    if ((errno != 0) && (errno != 404) && (errno != ENOENT))
     {
-        if ((errno != 404) && (errno != ENOENT))
-        {
-            return false; // Failure in fetching properties - errno set by blob_exists
-        }
-        switch(dir_blob_exists)
-        {
-            case D_NOTEXIST:
-                //log that the directory does not exist
-                return false;
-                break;
-            case D_EMPTY:
-                DeleteFile((std::string)directoryPath);
-                return true;
-            case D_NOTEMPTY:
-                return false;
-            default:
-                // Unforseen error,syslog and return false
-                break;
-        }
+        syslog(LOG_ERR,
+               "Failed to list blobs in a directory to determine if a directory is empty: %s. errno = %d.\n",
+               directoryPath.c_str(),
+               errno);
+        return false; // Failure in fetching properties - errno set by blob_exists
+    }
+    switch(dir_blob_exists)
+    {
+        case D_NOTEXIST:
+            //log that the directory does not exist
+            syslog(LOG_ERR,
+                   "Directory does not exist in storage, no directory to delete: %s. errno = %d.\n",
+                   directoryPath.c_str(),
+                   errno);
+            errno = ENOENT;
+            return false;
+            break;
+        case D_EMPTY:
+            syslog(LOG_DEBUG,
+                   "Directory is empty, attempting deleting directory marker: %s.\n",
+                   directoryPath.c_str());
+            DeleteFile((std::string)directoryPath);
+            return true;
+            break;
+        case D_NOTEMPTY:
+            syslog(LOG_ERR,
+                   "Directory is not empty, cannot delete: %s. errno = %d.\n",
+                   directoryPath.c_str(),
+                   errno);
+            errno = ENOTEMPTY;
+            return false;
+            break;
+        default:
+            // Unforseen error,syslog and return false at the end of function
+            syslog(LOG_ERR,
+                   "Unforseen error for deleting directory: %s. errno = %d.\n",
+                   directoryPath.c_str(),
+                   errno);
+            break;
     }
     return false;
 }
@@ -464,7 +483,7 @@ D_RETURN_CODE BlockBlobBfsClient::IsDirectoryEmpty(std::string path)
         return D_FAILED;
     }
 
-    return old_dir_blob_found ? D_EMPTY : D_NOTEMPTY;
+    return D_EMPTY;
 }
 
 int BlockBlobBfsClient::rename_single_file(std::string src, std::string dst, std::vector<std::string> & files_to_remove_cache)
@@ -837,7 +856,7 @@ std::vector<std::pair<std::vector<list_hierarchical_item>, bool>> BlockBlobBfsCl
             failcount = 0;
             AZS_DEBUGLOGV("Successful call to list_blobs_hierarchical.  results count = %d, next_marker = %s.\n", (int)response.m_items.size(), response.m_next_marker.c_str());
             continuation = response.m_next_marker;
-            if(response.m_items.size() > 0)
+            if(!response.m_items.empty())
             {
                 bool skip_first = false;
                 if(response.m_items[0].name == prior)
@@ -845,7 +864,7 @@ std::vector<std::pair<std::vector<list_hierarchical_item>, bool>> BlockBlobBfsCl
                     skip_first = true;
                 }
                 prior = response.m_items.back().name;
-                results.push_back(std::make_pair(std::move(response.m_items), skip_first));
+                results.emplace_back(std::move(response.m_items), skip_first);
             }
         }
         else
@@ -855,7 +874,7 @@ std::vector<std::pair<std::vector<list_hierarchical_item>, bool>> BlockBlobBfsCl
             syslog(LOG_WARNING, "list_blobs_hierarchical failed for the %d time with errno = %d.\n", failcount, errno);
 
         }
-    } while (((continuation.size() > 0) || !success) && (failcount < maxFailCount));
+    } while (((!continuation.empty()) || !success) && (failcount < maxFailCount));
 
     // errno will be set by list_blobs_hierarchial if the last call failed and we're out of retries.
     return results;

@@ -60,8 +60,10 @@ struct BfsFileProperty
                 m_metadata(metadata),
                 m_last_modified(last_modified),
                 m_size(size),
-                m_valid(true) {
-        if (!modestring.empty()) {
+                m_valid(true)
+    {
+        if (!modestring.empty())
+        {
             m_file_mode = 0000; // Supply no file mode to begin with unless the mode string is empty
             for (char & c : modestring) {
                 // Start by pushing back the mode_t.
@@ -70,6 +72,10 @@ struct BfsFileProperty
                 // This works because we can expect a consistent 9 character modestring.
                 m_file_mode |= (c != '-');
             }
+        }
+        else
+        {
+            m_file_mode = 0;
         }
     }
 

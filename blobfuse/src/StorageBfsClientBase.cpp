@@ -46,9 +46,8 @@ list_hierarchical_response::list_hierarchical_response(list_blobs_hierarchical_r
 {
     //TODO make this better
     unsigned int item_size = response.blobs.size();
-    std::vector<list_hierarchical_item> blob_items;
     for(unsigned int i = 0; i < item_size; i++)
     {
-        blob_items.push_back(list_hierarchical_item(response.blobs.at(i)));
+        m_items.push_back(list_hierarchical_item(response.blobs.at(i)));
     }
 }

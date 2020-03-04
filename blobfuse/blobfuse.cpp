@@ -270,35 +270,7 @@ int read_config(const std::string configFile)
 void *azs_init(struct fuse_conn_info * conn)
 {
     syslog(LOG_DEBUG, "azs_init ran");
-    if (file_options.use_adls != NULL)
-    {
-        syslog(LOG_DEBUG, "Initializing blobfuse using DataLake");
-        if (strcmp(file_options.use_adls, "true"))
-        {
-            storage_client = std::make_shared<DataLakeBfsClient>(str_options);
-        }
-        else
-        {
-            syslog(LOG_DEBUG, "Initializing blobfuse using block blobs");
-            //TODO:There's probably a way to not have this and have it skip to the other else.. I'm forgetting though
-            storage_client = std::make_shared<BlockBlobBfsClient>(str_options);
-        }
-    }
-    else
-    {
-        syslog(LOG_DEBUG, "Initializing blobfuse using block blobs");
-        storage_client = std::make_shared<BlockBlobBfsClient>(str_options);
-    }
-    if(storage_client->AuthenticateStorage())
-    {
-        syslog(LOG_DEBUG, "Successfully Authenticated!");
-    }
-    else
-    {
-        syslog(LOG_ERR, "Unable to start blobfuse due to a lack of credentials. Please check the readme for valid auth setups.");
-        azs_destroy(NULL);
-        return NULL;
-    }
+
     /*
     cfg->attr_timeout = 360;
     cfg->kernel_cache = 1;
@@ -629,6 +601,35 @@ int initialize_blobfuse()
         syslog(LOG_CRIT, "Unable to start blobfuse.  Failed to create directory on cache directory: %s, errno = %d.\n", prepend_mnt_path_string("/placeholder").c_str(),  errno);
         fprintf(stderr, "Failed to create directory on cache directory: %s, errno = %d.\n", prepend_mnt_path_string("/placeholder").c_str(),  errno);
         return 1;
+    }
+    //initialize storage client and authenticate, if we fail here, don't call fuse
+    if (file_options.use_adls != NULL)
+    {
+        syslog(LOG_DEBUG, "Initializing blobfuse using DataLake");
+        if (strcmp(file_options.use_adls, "true"))
+        {
+            storage_client = std::make_shared<DataLakeBfsClient>(str_options);
+        }
+        else
+        {
+            syslog(LOG_DEBUG, "Initializing blobfuse using block blobs");
+            //TODO:There's probably a way to not have this and have it skip to the other else.. I'm forgetting though
+            storage_client = std::make_shared<BlockBlobBfsClient>(str_options);
+        }
+    }
+    else
+    {
+        syslog(LOG_DEBUG, "Initializing blobfuse using block blobs");
+        storage_client = std::make_shared<BlockBlobBfsClient>(str_options);
+    }
+    if(storage_client->AuthenticateStorage())
+    {
+        syslog(LOG_DEBUG, "Successfully Authenticated!");
+    }
+    else
+    {
+        syslog(LOG_ERR, "Unable to start blobfuse due to a lack of credentials. Please check the readme for valid auth setups.");
+        return -1;
     }
     return 0;
 }

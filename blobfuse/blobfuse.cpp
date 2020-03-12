@@ -2,6 +2,8 @@
 #include <boost/filesystem.hpp>
 #include <string>
 
+std::shared_ptr<sync_blob_client> azure_blob_client_wrapper;
+
 namespace {
     std::string trim(const std::string& str) {
         const size_t start = str.find_first_not_of(' ');
@@ -269,8 +271,100 @@ int read_config(const std::string configFile)
 
 void *azs_init(struct fuse_conn_info * conn)
 {
-    syslog(LOG_DEBUG, "azs_init ran");
+    // TODO: Make all of this go down roughly the same pipeline, rather than having spaghettified code
+    AUTH_TYPE AuthType = get_auth_type();
 
+    if (str_options.useAttrCache)
+    {
+        if(AuthType == MSI_AUTH)
+        {
+            //1. get oauth token
+            std::function<OAuthToken(std::shared_ptr<CurlEasyClient>)> MSICallback = SetUpMSICallback(
+                    str_options.clientId,
+                    str_options.objectId,
+                    str_options.resourceId,
+                    str_options.msiEndpoint);
+
+            GetTokenManagerInstance(MSICallback); // We supply a default callback because we asssume that the oauth token manager has not initialized yet.
+            //2. try to make blob client wrapper using oauth token
+            //str_options.accountName
+            azure_blob_client_wrapper = std::make_shared<blob_client_attr_cache_wrapper>(
+                    blob_client_attr_cache_wrapper::blob_client_attr_cache_wrapper_oauth(
+                     str_options.accountName,
+                     max_concurrency_blob_wrapper,
+                     str_options.blobEndpoint));
+        }
+        else if(AuthType == KEY_AUTH) {
+            azure_blob_client_wrapper = std::make_shared<blob_client_attr_cache_wrapper>(
+                blob_client_attr_cache_wrapper::blob_client_attr_cache_wrapper_init_accountkey(
+                    str_options.accountName,
+                    str_options.accountKey,
+                    max_concurrency_blob_wrapper,
+                    str_options.useHttps,
+                    str_options.blobEndpoint));
+        }
+        else if(AuthType == SAS_AUTH) {
+            azure_blob_client_wrapper = std::make_shared<blob_client_attr_cache_wrapper>(
+                blob_client_attr_cache_wrapper::blob_client_attr_cache_wrapper_init_sastoken(
+                    str_options.accountName,
+                    str_options.sasToken,
+                    max_concurrency_blob_wrapper,
+                     str_options.useHttps,
+                    str_options.blobEndpoint));
+        }
+        else
+        {
+            syslog(LOG_ERR, "Unable to start blobfuse due to a lack of credentials. Please check the readme for valid auth setups.");
+        }
+    }
+    else
+    {
+        //TODO: Make a for authtype, and then if that's not specified, then a check against what credentials were specified
+        if(AuthType == MSI_AUTH)
+        { // If MSI is explicit, or if MSI options are set and auth type is implicit
+            //1. get oauth token
+            std::function<OAuthToken(std::shared_ptr<CurlEasyClient>)> MSICallback = SetUpMSICallback(
+                    str_options.clientId,
+                    str_options.objectId,
+                    str_options.resourceId,
+                    str_options.msiEndpoint);
+
+            GetTokenManagerInstance(MSICallback);
+            //2. try to make blob client wrapper using oauth token
+            azure_blob_client_wrapper = blob_client_wrapper_init_oauth(
+                    str_options.accountName,
+                    max_concurrency_blob_wrapper,
+                    str_options.blobEndpoint);
+        }
+        else if(AuthType == KEY_AUTH) {
+            azure_blob_client_wrapper = blob_client_wrapper_init_accountkey(
+            str_options.accountName,
+            str_options.accountKey,
+            max_concurrency_blob_wrapper,
+            str_options.useHttps,
+            str_options.blobEndpoint);
+        }
+        else if(AuthType == SAS_AUTH) {
+            azure_blob_client_wrapper = blob_client_wrapper_init_sastoken(
+            str_options.accountName,
+            str_options.sasToken,
+            max_concurrency_blob_wrapper,
+            str_options.useHttps,
+            str_options.blobEndpoint);
+        }
+        else
+        {
+            syslog(LOG_ERR, "Unable to start blobfuse due to a lack of credentials. Please check the readme for valid auth setups.");
+        }
+    }
+
+    if(errno != 0)
+    {
+        syslog(LOG_CRIT, "azs_init - Unable to start blobfuse.  Creating blob client failed: errno = %d.\n", errno);
+
+        // TODO: Improve this error case
+        return NULL;
+    }
     /*
     cfg->attr_timeout = 360;
     cfg->kernel_cache = 1;
@@ -356,23 +450,20 @@ int set_log_mask(const char * min_log_level_char)
     return 1;
 }
 
-void set_up_callbacks(fuse_operations &azs_blob_operations)
+void set_up_callbacks(struct fuse_operations & azs_blob_operations)
 {
     openlog(log_ident.c_str(), LOG_NDELAY | LOG_PID, 0);
 
     // Here, we set up all the callbacks that FUSE requires.
     azs_blob_operations.init = azs_init;
     azs_blob_operations.getattr = azs_getattr;
-    azs_blob_operations.fgetattr = azs_fgetattr;
     azs_blob_operations.statfs = azs_statfs;
     azs_blob_operations.access = azs_access;
     azs_blob_operations.readlink = azs_readlink;
     azs_blob_operations.readdir = azs_readdir;
     azs_blob_operations.open = azs_open;
-    azs_blob_operations.opendir = azs_opendir;
     azs_blob_operations.read = azs_read;
     azs_blob_operations.release = azs_release;
-    azs_blob_operations.releasedir = azs_releasedir;
     azs_blob_operations.fsync = azs_fsync;
     azs_blob_operations.create = azs_create;
     azs_blob_operations.write = azs_write;
@@ -381,7 +472,6 @@ void set_up_callbacks(fuse_operations &azs_blob_operations)
     azs_blob_operations.rmdir = azs_rmdir;
     azs_blob_operations.chown = azs_chown;
     azs_blob_operations.chmod = azs_chmod;
-    azs_blob_operations.flush = azs_flush;
     //#ifdef HAVE_UTIMENSAT
     azs_blob_operations.utimens = azs_utimens;
     //#endif
@@ -392,24 +482,7 @@ void set_up_callbacks(fuse_operations &azs_blob_operations)
     azs_blob_operations.getxattr = azs_getxattr;
     azs_blob_operations.listxattr = azs_listxattr;
     azs_blob_operations.removexattr = azs_removexattr;
-    azs_blob_operations.getdir = azs_getdir;
-    azs_blob_operations.mknod = azs_mknod;
-    azs_blob_operations.symlink = azs_symlink;
-    azs_blob_operations.link = azs_link;
-    azs_blob_operations.utime = azs_utime;
-    azs_blob_operations.fsyncdir = azs_fsyncdir;
-    azs_blob_operations.ftruncate = azs_ftruncate;
-    azs_blob_operations.bmap = azs_bmap;
-    azs_blob_operations.ioctl = azs_ioctl;
-    azs_blob_operations.poll = azs_poll;
-    azs_blob_operations.write_buf = azs_write_buf;
-    azs_blob_operations.read_buf = azs_read_buf;
-    azs_blob_operations.flock = azs_flock;
-    azs_blob_operations.fallocate = azs_fallocate;
-    azs_blob_operations.lock = azs_lock;
-
-    azs_blob_operations.flag_nullpath_ok = 1;
-    azs_blob_operations.flag_utime_omit_ok = 0;
+    azs_blob_operations.flush = azs_flush;
 }
 
 int read_and_set_arguments(int argc, char *argv[], struct fuse_args *args)
@@ -570,6 +643,85 @@ int configure_tls()
     return 0;
 }
 
+int validate_storage_connection()
+{
+    // The current implementation of blob_client_wrapper calls curl_global_init() in the constructor, and curl_global_cleanup in the destructor.
+    // Unfortunately, curl_global_init() has to be called in the same process as any HTTPS calls that are made, otherwise NSS is not configured properly.
+    // When running in daemon mode, the current process forks() and exits, while the child process lives on as a daemon.
+    // So, here we create and destroy a temp blob client in order to test the connection info, and we create the real one in azs_init, which is called after the fork().
+    {
+        std::shared_ptr<blob_client_wrapper> temp_azure_blob_client_wrapper;
+        AUTH_TYPE AuthType = get_auth_type();
+        //TODO: Make a for authtype, and then if that's not specified, then a check against what credentials were specified
+        if(AuthType == MSI_AUTH)
+        {
+            //1. get oauth token
+            std::function<OAuthToken(std::shared_ptr<CurlEasyClient>)> MSICallback = SetUpMSICallback(
+                    str_options.clientId,
+                    str_options.objectId,
+                    str_options.resourceId,
+                    str_options.msiEndpoint);
+
+            std::shared_ptr<OAuthTokenCredentialManager> tokenManager = GetTokenManagerInstance(MSICallback);
+
+            if (!tokenManager->is_valid_connection()) {
+                // todo: isolate definitions of errno's for this function so we can output something meaningful.
+                errno = 1;
+            }
+
+            //2. try to make blob client wrapper using oauth token
+            temp_azure_blob_client_wrapper = blob_client_wrapper_init_oauth(
+                    str_options.accountName,
+                    max_concurrency_blob_wrapper,
+                    str_options.blobEndpoint);
+        }
+        else if(AuthType == KEY_AUTH) {
+            temp_azure_blob_client_wrapper = blob_client_wrapper_init_accountkey(
+            str_options.accountName,
+            str_options.accountKey,
+            max_concurrency_blob_wrapper,
+            str_options.useHttps,
+            str_options.blobEndpoint);
+        }
+        else if(AuthType == SAS_AUTH) {
+            temp_azure_blob_client_wrapper = blob_client_wrapper_init_sastoken(
+            str_options.accountName,
+            str_options.sasToken,
+            max_concurrency_blob_wrapper,
+            str_options.useHttps,
+            str_options.blobEndpoint);
+        }
+        else
+        {
+            syslog(LOG_ERR, "Unable to start blobfuse due to a lack of credentials. Please check the readme for valid auth setups.");
+            errno = 1;
+        }
+        if(errno != 0)
+        {
+            syslog(LOG_CRIT, "Unable to start blobfuse.  Creating local blob client failed: errno = %d.\n", errno);
+            fprintf(stderr, "Unable to start blobfuse due to a lack of credentials. Please check the readme for valid auth setups."
+                            " Creating blob client failed: errno = %d.\n", errno);
+            return 1;
+        }
+
+        // Check if the account name/key and container is correct by attempting to list a blob.
+        // This will succeed even if there are zero blobs.
+        list_blobs_hierarchical_response response = temp_azure_blob_client_wrapper->list_blobs_hierarchical(
+            str_options.containerName,
+            "/",
+            std::string(),
+            std::string(),
+            1);
+        if(errno != 0)
+        {
+            syslog(LOG_CRIT, "Unable to start blobfuse.  Failed to connect to the storage container. There might be something wrong about the storage config, please double check the storage account name, account key/sas token/OAuth access token and container name. errno = %d\n", errno);
+            fprintf(stderr, "Failed to connect to the storage container. There might be something wrong about the storage config, please double check the storage account name, account key/sas token/OAuth access token and container name. errno = %d\n", errno);
+            return 1;
+        }
+    }
+    return 0;
+}
+
 void configure_fuse(struct fuse_args *args)
 {
     fuse_opt_add_arg(args, "-omax_read=131072");
@@ -601,35 +753,6 @@ int initialize_blobfuse()
         syslog(LOG_CRIT, "Unable to start blobfuse.  Failed to create directory on cache directory: %s, errno = %d.\n", prepend_mnt_path_string("/placeholder").c_str(),  errno);
         fprintf(stderr, "Failed to create directory on cache directory: %s, errno = %d.\n", prepend_mnt_path_string("/placeholder").c_str(),  errno);
         return 1;
-    }
-    //initialize storage client and authenticate, if we fail here, don't call fuse
-    if (file_options.use_adls != NULL)
-    {
-        syslog(LOG_DEBUG, "Initializing blobfuse using DataLake");
-        if (strcmp(file_options.use_adls, "true"))
-        {
-            storage_client = std::make_shared<DataLakeBfsClient>(str_options);
-        }
-        else
-        {
-            syslog(LOG_DEBUG, "Initializing blobfuse using block blobs");
-            //TODO:There's probably a way to not have this and have it skip to the other else.. I'm forgetting though
-            storage_client = std::make_shared<BlockBlobBfsClient>(str_options);
-        }
-    }
-    else
-    {
-        syslog(LOG_DEBUG, "Initializing blobfuse using block blobs");
-        storage_client = std::make_shared<BlockBlobBfsClient>(str_options);
-    }
-    if(storage_client->AuthenticateStorage())
-    {
-        syslog(LOG_DEBUG, "Successfully Authenticated!");
-    }
-    else
-    {
-        syslog(LOG_ERR, "Unable to start blobfuse due to a lack of credentials. Please check the readme for valid auth setups.");
-        return -1;
     }
     return 0;
 }

@@ -2,8 +2,8 @@
 
 int main(int argc, char *argv[])
 {
+    static struct fuse_operations azs_blob_operations;
 
-    fuse_operations azs_blob_operations;
     set_up_callbacks(azs_blob_operations);
 
     struct fuse_args args;
@@ -14,6 +14,12 @@ int main(int argc, char *argv[])
     }
 
     ret = configure_tls();
+    if (ret != 0)
+    {
+        return ret;
+    }
+
+    ret = validate_storage_connection();
     if (ret != 0)
     {
         return ret;

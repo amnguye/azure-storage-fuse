@@ -253,8 +253,34 @@ std::vector<std::string> DataLakeBfsClient::Rename(std::string sourcePath, std::
             sourcePath,
             configurations.containerName,
             destinationPath);
-    //stub for now
-    return std::vector<std::string>();
+
+    std::vector<std::string> file_paths_to_remove;
+    std::string srcMntPathString = prepend_mnt_path_string(sourcePath);
+    std::string dstMntPathString = prepend_mnt_path_string(destinationPath);
+
+    int rename_ret = rename(srcMntPathString.c_str(), dstMntPathString.c_str());
+    if(rename_ret != 0)
+    {
+        syslog(LOG_ERR, "Failure to rename source file %s in the local cache.  Errno = %d.\n", sourcePath.c_str(), errno);
+    }
+    file_paths_to_remove.push_back(sourcePath);
+    return file_paths_to_remove;
+}
+
+list_hierarchical_response DataLakeBfsClient::List(std::string continuation, std::string prefix, std::string delimiter)
+{
+    syslog(LOG_DEBUG, "Calling List Paths, continuation:%s, prefix:%s, delimiter:%s\n",
+            continuation.c_str(),
+            prefix.c_str(),
+            delimiter.c_str());
+    microsoft_azure::storage_adls::list_paths_result listed_adls_response = m_adls_client->list_paths_segmented(
+            configurations.containerName,
+            prefix,
+            false,
+            continuation,
+            10000);
+    return list_hierarchical_response(listed_adls_response);
+
 }
 
 int DataLakeBfsClient::ChangeMode(const char *path, mode_t mode) {

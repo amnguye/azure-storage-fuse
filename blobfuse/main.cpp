@@ -19,12 +19,6 @@ int main(int argc, char *argv[])
         return ret;
     }
 
-    ret = validate_storage_connection();
-    if (ret != 0)
-    {
-        return ret;
-    }
-
     configure_fuse(&args);
 
     ret = initialize_blobfuse();

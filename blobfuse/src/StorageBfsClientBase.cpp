@@ -39,6 +39,14 @@ list_hierarchical_item::list_hierarchical_item(list_blobs_hierarchical_item item
         metadata(std::move(item.metadata)),
         is_directory(item.is_directory) {}
 
+list_hierarchical_item::list_hierarchical_item(microsoft_azure::storage_adls::list_paths_item item) :
+        name(item.name),
+        last_modified(item.last_modified),
+        etag(item.etag),
+        content_length(item.content_length),
+        acl(item.acl),
+        is_directory(item.is_directory) {}
+
 list_hierarchical_response::list_hierarchical_response(list_blobs_hierarchical_response response) :
         m_ms_request_id(std::move(response.ms_request_id)),
         m_next_marker(std::move(response.next_marker)),
@@ -49,5 +57,17 @@ list_hierarchical_response::list_hierarchical_response(list_blobs_hierarchical_r
     for(unsigned int i = 0; i < item_size; i++)
     {
         m_items.push_back(list_hierarchical_item(response.blobs.at(i)));
+    }
+}
+
+list_hierarchical_response::list_hierarchical_response(microsoft_azure::storage_adls::list_paths_result response) :
+    continuation_token(std::move(response.continuation_token)),
+    m_valid(true)
+{
+    //TODO make this better
+    unsigned int item_size = response.paths.size();
+    for(unsigned int i = 0; i < item_size; i++)
+    {
+        m_items.push_back(list_hierarchical_item(response.paths.at(i)));
     }
 }

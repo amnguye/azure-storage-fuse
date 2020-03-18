@@ -108,129 +108,6 @@ int ensure_files_directory_exists_in_cache(const std::string& file_path)
     return status;
 }
 
-std::vector<std::pair<std::vector<list_blobs_hierarchical_item>, bool>> list_all_blobs_hierarchical(const std::string& container, const std::string& delimiter, const std::string& prefix)
-{
-    static const int maxFailCount = 20;
-    std::vector<std::pair<std::vector<list_blobs_hierarchical_item>, bool>>  results;
-
-    std::string continuation;
-
-    std::string prior;
-    bool success = false;
-    int failcount = 0;
-    do
-    {
-        AZS_DEBUGLOGV("About to call list_blobs_hierarchial.  Container = %s, delimiter = %s, continuation = %s, prefix = %s\n", container.c_str(), delimiter.c_str(), continuation.c_str(), prefix.c_str());
-
-        errno = 0;
-        list_blobs_hierarchical_response response = azure_blob_client_wrapper->list_blobs_hierarchical(container, delimiter, continuation, prefix);
-        if (errno == 0)
-        {
-            success = true;
-            failcount = 0;
-            AZS_DEBUGLOGV("Successful call to list_blobs_hierarchical.  results count = %s, next_marker = %s.\n", to_str(response.blobs.size()).c_str(), response.next_marker.c_str());
-            continuation = response.next_marker;
-            if(response.blobs.size() > 0)
-            {
-                bool skip_first = false;
-                if(response.blobs[0].name == prior)
-                {
-                    skip_first = true;
-                }
-                prior = response.blobs.back().name;
-                results.push_back(std::make_pair(std::move(response.blobs), skip_first));
-            }
-        }
-        else
-        {
-            failcount++;
-            success = false;
-            syslog(LOG_WARNING, "list_blobs_hierarchical failed for the %d time with errno = %d.\n", failcount, errno);
-
-        }
-    } while (((continuation.size() > 0) || !success) && (failcount < maxFailCount));
-
-    // errno will be set by list_blobs_hierarchial if the last call failed and we're out of retries.
-    return results;
-}
-
-/*
- * Check if the direcotry is empty or not by checking if there is any blob with prefix exists in the specified container.
- *
- * return
- *   - D_NOTEXIST if there's nothing there (the directory does not exist)
- *   - D_EMPTY is there's exactly one blob, and it's the ".directory" blob
- *   - D_NOTEMPTY otherwise (the directory exists and is not empty.)
- */
-int is_directory_empty(const std::string& container, const std::string& dir_name)
-{
-    std::string delimiter = "/";
-    bool dir_blob_exists = false;
-    errno = 0;
-    blob_property props = azure_blob_client_wrapper->get_blob_property(container, dir_name);
-    if ((errno == 0) && (props.valid()))
-    {
-        dir_blob_exists = is_directory_blob(props.size, props.metadata);
-    }
-    if (errno != 0)
-    {
-        if ((errno != 404) && (errno != ENOENT))
-        {
-            return -1; // Failure in fetching properties - errno set by blob_exists
-        }
-    }
-
-    std::string prefix_with_slash = dir_name;
-    prefix_with_slash.append(delimiter);
-    std::string continuation;
-    bool success = false;
-    int failcount = 0;
-    bool old_dir_blob_found = false;
-    do
-    {
-        errno = 0;
-        list_blobs_hierarchical_response response = azure_blob_client_wrapper->list_blobs_hierarchical(container, delimiter, continuation, prefix_with_slash, 2);
-        if (errno == 0)
-        {
-            success = true;
-            failcount = 0;
-            continuation = response.next_marker;
-            if (response.blobs.size() > 1)
-            {
-                return D_NOTEMPTY;
-            }
-            if (response.blobs.size() > 0)
-            {
-                if ((!old_dir_blob_found) &&
-                    (!response.blobs[0].is_directory) &&
-                    (response.blobs[0].name.size() > former_directory_signifier.size()) &&
-                    (0 == response.blobs[0].name.compare(response.blobs[0].name.size() - former_directory_signifier.size(), former_directory_signifier.size(), former_directory_signifier)))
-                {
-                    old_dir_blob_found = true;
-                }
-                else
-                {
-                    return D_NOTEMPTY;
-                }
-            }
-        }
-        else
-        {
-            success = false;
-            failcount++; //TODO: use to set errno.
-        }
-    } while ((continuation.size() > 0 || !success) && failcount < 20);
-
-    if (!success)
-    {
-    // errno will be set by list_blobs_hierarchial if the last call failed and we're out of retries.
-        return -1;
-    }
-
-    return old_dir_blob_found || dir_blob_exists ? D_EMPTY : D_NOTEXIST;
-}
-
-
 int azs_getattr(const char *path, struct stat *stbuf)
 {
     AZS_DEBUGLOGV("azs_getattr called with path = %s\n", path);
@@ -282,38 +159,39 @@ int azs_getattr(const char *path, struct stat *stbuf)
     // It's not in the local cache.  Check to see if it's a blob on the service:
     std::string blobNameStr(&(path[1]));
     errno = 0;
-    auto blob_property = azure_blob_client_wrapper->get_blob_property(str_options.containerName, blobNameStr);
+    BfsFileProperty blob_property = storage_client->GetProperties(blobNameStr);
+    mode_t perms = blob_property.m_file_mode == 0 ?  str_options.defaultPermission : blob_property.m_file_mode;
 
-    if ((errno == 0) && blob_property.valid())
+    if ((errno == 0) && blob_property.isValid())
     {
-        if (is_directory_blob(blob_property.size, blob_property.metadata))
+        if (is_directory_blob(blob_property.size(), blob_property.m_metadata))
         {
             AZS_DEBUGLOGV("Blob %s, representing a directory, found during get_attr.\n", path);
-            stbuf->st_mode = S_IFDIR | str_options.defaultPermission;
+            stbuf->st_mode = S_IFDIR | perms;
             // If st_nlink = 2, means directory is empty.
             // Directory size will affect behaviour for mv, rmdir, cp etc.
             stbuf->st_uid = fuse_get_context()->uid;
             stbuf->st_gid = fuse_get_context()->gid;
-            stbuf->st_nlink = is_directory_empty(str_options.containerName, blobNameStr) == D_EMPTY ? 2 : 3;
+            stbuf->st_nlink = storage_client->IsDirectoryEmpty(blobNameStr.c_str()) == D_EMPTY ? 2 : 3;
             stbuf->st_size = 4096;
             return 0;
         }
 
         AZS_DEBUGLOGV("Blob %s, representing a file, found during get_attr.\n", path);
-        stbuf->st_mode = S_IFREG | str_options.defaultPermission; // Regular file (not a directory)
+        stbuf->st_mode = S_IFREG | perms; // Regular file (not a directory)
         stbuf->st_uid = fuse_get_context()->uid;
         stbuf->st_gid = fuse_get_context()->gid;
-        stbuf->st_mtime = blob_property.last_modified;
+        stbuf->st_mtime = blob_property.last_modified();
         stbuf->st_nlink = 1;
-        stbuf->st_size = blob_property.size;
+        stbuf->st_size = blob_property.size();
         return 0;
     }
-    else if (errno == 0 && !blob_property.valid())
+    else if (errno == 0 && !blob_property.isValid())
     {
         // Check to see if it's a directory, instead of a file
 
         errno = 0;
-        int dirSize = is_directory_empty(str_options.containerName, blobNameStr);
+        int dirSize = is_directory_blob(blob_property.size(), blob_property.m_metadata);
         if (errno != 0)
         {
             int storage_errno = errno;
@@ -412,6 +290,9 @@ int azs_chmod(const char * path, mode_t mode)
 {
     AZS_DEBUGLOGV("azs_chmod called with path = %s, mode = %o.\n", path, mode);
 
+    errno = 0;
+    storage_client->ChangeMode(path, mode);
+
     return errno;
 }
 
@@ -424,149 +305,6 @@ int azs_utimens(const char * /*path*/, const struct timespec [2] /*ts[2]*/)
 }
 //  #endif
 
-int azs_rename_directory(const char *src, const char *dst)
-{
-    AZS_DEBUGLOGV("azs_rename_directory called with src = %s, dst = %s.\n", src, dst);
-    std::string srcPathStr(src);
-    std::string dstPathStr(dst);
-
-    // Rename the directory blob, if it exists.
-    errno = 0;
-    blob_property props = azure_blob_client_wrapper->get_blob_property(str_options.containerName, srcPathStr.substr(1));
-    if ((errno == 0) && (props.valid()))
-    {
-        if (is_directory_blob(props.size, props.metadata))
-        {
-            azs_rename_single_file(src, dst);
-        }
-    }
-    if (errno != 0)
-    {
-        if ((errno != 404) && (errno != ENOENT))
-        {
-            return 0 - map_errno(errno); // Failure in fetching properties - errno set by blob_exists
-        }
-    }
-
-    if (srcPathStr.size() > 1)
-    {
-        srcPathStr.push_back('/');
-    }
-    if (dstPathStr.size() > 1)
-    {
-        dstPathStr.push_back('/');
-    }
-    std::vector<std::string> local_list_results;
-
-    // Rename all files and directories that exist in the local cache.
-    ensure_files_directory_exists_in_cache(prepend_mnt_path_string(dstPathStr + "placeholder"));
-    std::string mntPathString = prepend_mnt_path_string(srcPathStr);
-    DIR *dir_stream = opendir(mntPathString.c_str());
-    if (dir_stream != NULL)
-    {
-        struct dirent* dir_ent = readdir(dir_stream);
-        while (dir_ent != NULL)
-        {
-            if (dir_ent->d_name[0] != '.')
-            {
-                int nameLen = strlen(dir_ent->d_name);
-                char *newSrc = (char *)malloc(sizeof(char) * (srcPathStr.size() + nameLen + 1));
-                memcpy(newSrc, srcPathStr.c_str(), srcPathStr.size());
-                memcpy(&(newSrc[srcPathStr.size()]), dir_ent->d_name, nameLen);
-                newSrc[srcPathStr.size() + nameLen] = '\0';
-
-                char *newDst = (char *)malloc(sizeof(char) * (dstPathStr.size() + nameLen + 1));
-                memcpy(newDst, dstPathStr.c_str(), dstPathStr.size());
-                memcpy(&(newDst[dstPathStr.size()]), dir_ent->d_name, nameLen);
-                newDst[dstPathStr.size() + nameLen] = '\0';
-
-                AZS_DEBUGLOGV("Local object found - about to rename %s to %s.\n", newSrc, newDst);
-                if (dir_ent->d_type == DT_DIR)
-                {
-                    azs_rename_directory(newSrc, newDst);
-                }
-                else
-                {
-                    azs_rename_single_file(newSrc, newDst);
-                }
-
-                free(newSrc);
-                free(newDst);
-
-                std::string dir_str(dir_ent->d_name);
-                local_list_results.push_back(dir_str);
-            }
-
-            dir_ent = readdir(dir_stream);
-        }
-
-        closedir(dir_stream);
-    }
-
-    // Rename all files & directories that don't exist in the local cache.
-    errno = 0;
-    std::vector<std::pair<std::vector<list_blobs_hierarchical_item>, bool>> listResults = list_all_blobs_hierarchical(str_options.containerName, "/", srcPathStr.substr(1));
-    if (errno != 0)
-    {
-        int storage_errno = errno;
-        syslog(LOG_ERR, "list blobs operation failed during attempt to rename directory %s to %s.  errno = %d.\n", src, dst, storage_errno);
-        return 0 - map_errno(storage_errno);
-    }
-
-    AZS_DEBUGLOGV("Total of %s result lists found from list_blobs call during rename operation\n.", to_str(listResults.size()).c_str());
-    for (size_t result_lists_index = 0; result_lists_index < listResults.size(); result_lists_index++)
-    {
-        int start = listResults[result_lists_index].second ? 1 : 0;
-        for (size_t i = start; i < listResults[result_lists_index].first.size(); i++)
-        {
-            // We need to parse out just the trailing part of the path name.
-            int len = listResults[result_lists_index].first[i].name.size();
-            if (len > 0)
-            {
-                std::string prev_token_str;
-                if (listResults[result_lists_index].first[i].name.back() == '/')
-                {
-                    prev_token_str = listResults[result_lists_index].first[i].name.substr(srcPathStr.size() - 1, listResults[result_lists_index].first[i].name.size() - srcPathStr.size());
-                }
-                else
-                {
-                    prev_token_str = listResults[result_lists_index].first[i].name.substr(srcPathStr.size() - 1);
-                }
-
-                // TODO: order or hash the list to improve perf
-                if ((prev_token_str.size() > 0) && (std::find(local_list_results.begin(), local_list_results.end(), prev_token_str) == local_list_results.end()))
-                {
-                    int nameLen = prev_token_str.size();
-                    char *newSrc = (char *)malloc(sizeof(char) * (srcPathStr.size() + nameLen + 1));
-                    memcpy(newSrc, srcPathStr.c_str(), srcPathStr.size());
-                    memcpy(&(newSrc[srcPathStr.size()]), prev_token_str.c_str(), nameLen);
-                    newSrc[srcPathStr.size() + nameLen] = '\0';
-
-                    char *newDst = (char *)malloc(sizeof(char) * (dstPathStr.size() + nameLen + 1));
-                    memcpy(newDst, dstPathStr.c_str(), dstPathStr.size());
-                    memcpy(&(newDst[dstPathStr.size()]), prev_token_str.c_str(), nameLen);
-                    newDst[dstPathStr.size() + nameLen] = '\0';
-
-                    AZS_DEBUGLOGV("Object found on the service - about to rename %s to %s.\n", newSrc, newDst);
-                    if (listResults[result_lists_index].first[i].is_directory)
-                    {
-                        azs_rename_directory(newSrc, newDst);
-                    }
-                    else
-                    {
-                        azs_rename_single_file(newSrc, newDst);
-                    }
-
-                    free(newSrc);
-                    free(newDst);
-                }
-            }
-        }
-    }
-    azs_rmdir(src);
-    return 0;
-}
-
 // TODO: Fix bug where the files and directories in the source in the file cache are not deleted.
 // TODO: Fix bugs where the a file has been created but not yet uploaded.
 // TODO: Fix the bug where this fails for multi-level dirrectories.
@@ -575,20 +313,12 @@ int azs_rename(const char *src, const char *dst)
 {
     AZS_DEBUGLOGV("azs_rename called with src = %s, dst = %s.\n", src, dst);
 
-    struct stat statbuf;
     errno = 0;
-    int getattrret = azs_getattr(src, &statbuf);
-    if (getattrret != 0)
+    std::vector<std::string> to_remove = storage_client->Rename(src,dst);
+
+    for(unsigned int i = 0; i < to_remove.size(); i++)
     {
-        return getattrret;
-    }
-    if ((statbuf.st_mode & S_IFDIR) == S_IFDIR)
-    {
-        azs_rename_directory(src, dst);
-    }
-    else
-    {
-        azs_rename_single_file(src, dst);
+        g_gc_cache->add_file(to_remove.at(i));
     }
 
     return 0;

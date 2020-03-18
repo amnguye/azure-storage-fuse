@@ -8,6 +8,7 @@
 
 //TODO: to remove once we unify list responses
 #include "list_blobs_request_base.h"
+#include "list_paths_request.h"
 
 #ifndef STORAGEBFSCLIENTBASE_H
 #define STORAGEBFSCLIENTBASE_H
@@ -29,6 +30,7 @@ struct str_options
     int fileCacheTimeoutInSeconds;
     bool useHttps;
     bool useAttrCache;
+    bool useADLS;
     //this is set by the --allow-other flag,
     // 0770 if not set, 0777 if the flag is set
     int defaultPermission;
@@ -113,6 +115,7 @@ struct BfsFileProperty
 
 struct list_hierarchical_item {
     list_hierarchical_item(list_blobs_hierarchical_item);
+    list_hierarchical_item(microsoft_azure::storage_adls::list_paths_item item);
     std::string name;
     std::string snapshot;
     std::string last_modified;
@@ -125,15 +128,18 @@ struct list_hierarchical_item {
     std::string cache_control;
     std::string copy_status;
     std::vector<std::pair<std::string, std::string>> metadata;
+    microsoft_azure::storage_adls::access_control acl;
     bool is_directory;
 };
 
 struct list_hierarchical_response {
     list_hierarchical_response() : m_valid(false) {}
     list_hierarchical_response(list_blobs_hierarchical_response response);
+    list_hierarchical_response(microsoft_azure::storage_adls::list_paths_result response);
     std::string m_ms_request_id;
     std::vector<list_hierarchical_item> m_items;
     std::string m_next_marker;
+    std::string continuation_token;
     bool m_valid;
 };
 
@@ -211,7 +217,7 @@ public:
     /// Lists
     ///</summary>
     ///<returns>none</returns>
-    virtual list_hierarchical_response List(const std::string delimiter, std::string continuation, const std::string prefix) const = 0;
+    virtual list_hierarchical_response List(std::string continuation, const std::string prefix, const std::string delimiter) = 0;
     ///<summary>
     /// LIsts all directories within a list container
     /// Greedily list all blobs using the input params.
@@ -224,7 +230,6 @@ public:
 
 protected:
     str_options configurations;
-
     ///<summary>
     /// Helper function - To map errno
     ///</summary>

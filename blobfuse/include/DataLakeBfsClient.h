@@ -37,6 +37,11 @@ public:
     ///<returns>none</returns>
     std::vector<std::string> Rename(std::string sourcePath, std::string destinationPath) override;
     ///<summary>
+    /// Lists
+    ///</summary>
+    ///<returns>none</returns>
+    list_hierarchical_response List(std::string continuation, std::string prefix, std::string delimiter = "") override;
+    ///<summary>
     /// Updates the UNIX-style file mode on a path.
     ///</summary>
     int ChangeMode(const char* path, mode_t mode) override;

@@ -81,7 +81,7 @@ public:
     /// Lists
     ///</summary>
     ///<returns>none</returns>
-    list_hierarchical_response List(std::string delimiter, std::string continuation, std::string prefix) const override;
+    list_hierarchical_response List(std::string continuation, std::string prefix, std::string delimiter) override;
     ///<summary>
     /// LIsts all directories within a list container
     /// Greedily list all blobs using the input params.

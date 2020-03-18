@@ -7,13 +7,8 @@ int azs_mkdir(const char *path, mode_t)
 
     std::string pathstr(path);
 
-    // We want to upload a zero-length blob in this case - it's just a marker that there's a directory.
-    std::istringstream emptyDataStream("");
-
-    std::vector<std::pair<std::string, std::string>> metadata;
-    metadata.push_back(std::make_pair("hdi_isfolder", "true"));
     errno = 0;
-    azure_blob_client_wrapper->upload_block_blob_from_stream(str_options.containerName, pathstr.substr(1), emptyDataStream, metadata);
+    storage_client->CreateDirectory(pathstr.substr(1).c_str());
     if (errno != 0)
     {
         int storage_errno = errno;
@@ -102,7 +97,7 @@ int azs_readdir(const char *path, void *buf, fuse_fill_dir_t filler, off_t, stru
     }
 
     errno = 0;
-    std::vector<std::pair<std::vector<list_blobs_hierarchical_item>, bool>> listResults = list_all_blobs_hierarchical(str_options.containerName, "/", pathStr.substr(1));
+    std::vector<std::pair<std::vector<list_hierarchical_item>, bool>> listResults = storage_client->ListAllItemsHierarchical("/", pathStr.substr(1));
     if (errno != 0)
     {
         int storage_errno = errno;
@@ -190,6 +185,9 @@ int azs_readdir(const char *path, void *buf, fuse_fill_dir_t filler, off_t, stru
     return 0;
 }
 
+/*
+ * Removes empty directories
+ */
 int azs_rmdir(const char *path)
 {
     AZS_DEBUGLOGV("azs_rmdir called with path = %s\n", path);
@@ -202,55 +200,10 @@ int azs_rmdir(const char *path)
     AZS_DEBUGLOGV("Attempting to delete local cache directory %s.\n", mntPath);
     remove(mntPath); // This will fail if the cache is not empty, which is fine, as in this case it will also fail later, after the server-side check.
 
-    errno = 0;
-    int dirStatus = is_directory_empty(str_options.containerName, pathString.substr(1));
-    if (errno != 0)
+    if(!storage_client->DeleteDirectory(pathString.substr(1)))
     {
-        int storage_errno = errno;
-        syslog(LOG_ERR, "Failure to query the service to determine if directory %s is empty.  errno = %d.\n", path, storage_errno);
-        return 0 - map_errno(errno);
+        return -errno;
     }
-    if (dirStatus == D_NOTEXIST)
-    {
-        syslog(LOG_ERR, "Directory %s does not exist; failing directory delete operation.\n", path);
-        return -ENOENT;
-    }
-    if (dirStatus == D_NOTEMPTY)
-    {
-        syslog(LOG_ERR, "Directory %s is not empty; failing directory delete operation.\n", path);
-        return -ENOTEMPTY;
-    }
-
-    // TODO: change this to just delete blobs.
-    errno = 0;
-    azure_blob_client_wrapper->delete_blob(str_options.containerName, pathString.substr(1));
-    int dir_blob_delete_errno = errno;
-    if (dir_blob_delete_errno == 0)
-    {
-        syslog(LOG_INFO, "Successfully deleted directory marker %s for path %s. ", pathString.c_str()+1, path);
-    }
-    else
-    {
-        AZS_DEBUGLOGV("Failed to delete directory marker %s at path %s, errno = %d.  Checking the .directory version.\n", mntPath, pathString.c_str()+1, dir_blob_delete_errno);
-
-        pathString.append("/.directory");
-
-        errno = 0;
-        azure_blob_client_wrapper->delete_blob(str_options.containerName, pathString.substr(1));
-        int old_dir_blob_delete_errno = errno;
-
-        if (old_dir_blob_delete_errno == 0)
-        {
-            syslog(LOG_INFO, "Successfully deleted .directory-style directory marker for path %s to blob %s. ", path, pathString.c_str()+1);
-        }
-        else
-        {
-            // If they both fail, dir_blob_delete_errno will be the important one in 99.99% of cases
-            syslog(LOG_ERR, "Failed I/O operation to delete directory %s.  errno = %d\n", path, dir_blob_delete_errno);
-            return 0 - map_errno(dir_blob_delete_errno);
-        }
-    }
-
     return 0;
 }
 

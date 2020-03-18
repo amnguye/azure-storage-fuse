@@ -22,6 +22,8 @@
 #include "gc_cache.h"
 #include "BlockBlobBfsClient.h"
 #include "DataLakeBfsClient.h"
+#include "OAuthToken.h"
+#include "OAuthTokenCredentialManager.h"
 
 // Declare that we're using version 2.9 of FUSE
 // 3.0 is not built-in to many distros yet.
@@ -30,9 +32,6 @@
 
 #include <fuse.h>
 #include <stddef.h>
-#include "blob/blob_client.h"
-#include "OAuthToken.h"
-#include "OAuthTokenCredentialManager.h"
 
 #define UNREFERENCED_PARAMETER(p) (p)
 
@@ -59,7 +58,7 @@ extern struct str_options str_options;
 
 // This is used to make all the calls to Storage
 // The C++ lite client does not store state, other than connection info, so we can use it between calls without issue.
-extern std::shared_ptr<sync_blob_client> azure_blob_client_wrapper;
+extern std::shared_ptr<StorageBfsClientBase> storage_client;
 
 // Helper function to map an HTTP error to an errno.
 // Should be called on any errno returned from the Azure Storage cpp lite lib.
@@ -77,15 +76,6 @@ int shared_lock_file(int flags, int fd);
 
 // Helper function to create all directories in the path if they don't already exist.
 int ensure_files_directory_exists_in_cache(const std::string& file_path);
-
-// Greedily list all blobs using the input params.
-std::vector<std::pair<std::vector<list_blobs_hierarchical_item>, bool>> list_all_blobs_hierarchical(const std::string& container, const std::string& delimiter, const std::string& prefix);
-
-// Returns:
-// 0 if there's nothing there (the directory does not exist)
-// 1 If there's either the ".directory" blob, or the hdfs-type directory blob
-// 2 otherwise (the directory exists and is not empty.)
-int is_directory_empty(const std::string& container, const std::string& dir_name);
 
 // Returns true if the input has zero length and the "hdi_isfolder=true" metadata.
 bool is_directory_blob(unsigned long long size, std::vector<std::pair<std::string, std::string>> metadata);
@@ -105,7 +95,6 @@ void configure_fuse(struct fuse_args *args);
 // Initializes blobfuse cache temporary directory
 int initialize_blobfuse();
 
-int validate_storage_connection();
 /**
  * get_attr is the general-purpose "get information about the file or directory at this path"
  * function called by FUSE.  Most important is to return whether the item is a file or a directory.
@@ -299,9 +288,6 @@ int azs_listxattr(const char *path, char *list, size_t size);
 
 /** Not implemented. */
 int azs_removexattr(const char *path, const char *name);
-
-/** Internal method, used to rename a single file in a (hopefully) lock-safe manner. */
-int azs_rename_single_file(const char *src, const char *dst);
 
 /**
 * Convert a value into a string.

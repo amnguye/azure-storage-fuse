@@ -347,7 +347,7 @@ bool BlockBlobBfsClient::Copy(const std::string sourcePath, const std::string de
 ///<summary>
 /// Renames a file
 ///</summary>
-///<returns>none</returns>
+///<returns>List of files in the cache to remove</returns>
 std::vector<std::string> BlockBlobBfsClient::Rename(const std::string sourcePath, const std::string destinationPath)
 {
     // Rename the directory blob, if it exists.
@@ -381,7 +381,7 @@ std::vector<std::string> BlockBlobBfsClient::Rename(const std::string sourcePath
 ///</summary>
 ///<returns>none</returns>
 list_hierarchical_response
-BlockBlobBfsClient::List(const std::string delimiter, std::string continuation, const std::string prefix) const
+BlockBlobBfsClient::List(std::string continuation, const std::string prefix, const std::string delimiter)
 {
 
     //TODO: MAKE THIS BETTER
@@ -656,10 +656,11 @@ int BlockBlobBfsClient::rename_single_file(std::string src, std::string dst, std
 int BlockBlobBfsClient::rename_directory(std::string src, std::string dst, std::vector<std::string> & files_to_remove_cache)
 {
     AZS_DEBUGLOGV("azs_rename_directory called with src = %s, dst = %s.\n", src.c_str(), dst.c_str());
-
+    std::string srcPathStr(src);
     // Rename the directory blob, if it exists.
     errno = 0;
-    if (Exists(src))
+
+    if (IsDirectory(srcPathStr.substr(1).c_str()))
     {
         rename_single_file(src, dst, files_to_remove_cache);
     }

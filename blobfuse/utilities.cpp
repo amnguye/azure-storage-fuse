@@ -164,7 +164,7 @@ int azs_getattr(const char *path, struct stat *stbuf)
 
     if ((errno == 0) && blob_property.isValid())
     {
-        if (is_directory_blob(blob_property.size(), blob_property.m_metadata))
+        if (blob_property.is_directory)
         {
             AZS_DEBUGLOGV("Blob %s, representing a directory, found during get_attr.\n", path);
             stbuf->st_mode = S_IFDIR | perms;
@@ -189,7 +189,6 @@ int azs_getattr(const char *path, struct stat *stbuf)
     else if (errno == 0 && !blob_property.isValid())
     {
         // Check to see if it's a directory, instead of a file
-
         errno = 0;
         int dirSize = is_directory_blob(blob_property.size(), blob_property.m_metadata);
         if (errno != 0)

@@ -69,6 +69,7 @@ struct BfsFileProperty
                 m_size(size),
                 m_valid(true)
     {
+        // This is mainly used in the Blob Client
         if (!modestring.empty())
         {
             m_file_mode = 0000; // Supply no file mode to begin with unless the mode string is empty
@@ -84,6 +85,84 @@ struct BfsFileProperty
         {
             m_file_mode = 0;
         }
+
+        is_directory = false;
+        if (size == 0)
+        {
+            for (auto iter = metadata.begin(); iter != metadata.end(); ++iter)
+            {
+                if ((iter->first.compare("hdi_isfolder") == 0) && (iter->second.compare("true") == 0))
+                {
+                    is_directory = true;
+                }
+            }
+        }
+    }
+    BfsFileProperty(std::string cache_control,
+                    std::string content_disposition,
+                    std::string content_encoding,
+                    std::string content_language,
+                    std::string content_md5,
+                    std::string content_type,
+                    std::string etag,
+                    std::string resource_type,
+                    std::string owner,
+                    std::string group,
+                    std::string permissions,
+                    std::vector<std::pair<std::string, std::string>> metadata,
+                    time_t last_modified,
+                    std::string modestring,
+                    unsigned long long size) :
+            m_cache_control(cache_control),
+            m_content_disposition(content_disposition),
+            m_content_encoding(content_encoding),
+            m_content_language(content_language),
+            m_content_md5(content_md5),
+            m_content_type(content_type),
+            m_etag(etag),
+            m_copy_status(""),
+            m_owner(owner),
+            m_group(group),
+            m_permissions(permissions),
+            m_metadata(metadata),
+            m_last_modified(last_modified),
+            m_size(size),
+            m_valid(true)
+    {
+        //This is mainly used in the ADLS client
+        if (!modestring.empty())
+        {
+            m_file_mode = 0000; // Supply no file mode to begin with unless the mode string is empty
+            for (char & c : modestring) {
+                // Start by pushing back the mode_t.
+                m_file_mode = m_file_mode << 1; // NOLINT(hicpp-signed-bitwise) (mode_t is signed, apparently. Suppress the inspection.)
+                // Then flip the new bit based on whether the mode is enabled or not.
+                // This works because we can expect a consistent 9 character modestring.
+                m_file_mode |= (c != '-');
+            }
+        }
+        else
+        {
+            m_file_mode = 0;
+        }
+        if(resource_type == "directory")
+        {
+            is_directory = true;
+        }
+        else
+        {
+            is_directory = false;
+            if (size == 0)
+            {
+                for (auto iter = metadata.begin(); iter != metadata.end(); ++iter)
+                {
+                    if ((iter->first.compare("hdi_isfolder") == 0) && (iter->second.compare("true") == 0))
+                    {
+                        is_directory = true;
+                    }
+                }
+            }
+        }
     }
 
     std::string m_cache_control;
@@ -94,10 +173,14 @@ struct BfsFileProperty
     std::string m_content_type;
     std::string m_etag;
     std::string m_copy_status;
+    std::string m_owner;
+    std::string m_group;
+    std::string m_permissions;
     std::vector<std::pair<std::string, std::string>> m_metadata;
     time_t m_last_modified;
     mode_t m_file_mode;
     unsigned long long m_size;
+    bool is_directory;
     bool m_valid;
 
     bool isValid()
@@ -155,7 +238,7 @@ public:
     {}
     ///<summary>
     /// Authenticates the storage account and container
-    ///</summary>
+    ///</summary> 
     ///<returns>bool: if we authenticate to the storage account and container successfully</returns>
     virtual bool AuthenticateStorage() = 0;
     ///<summary>

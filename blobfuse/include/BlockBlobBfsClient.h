@@ -86,12 +86,32 @@ public:
     /// LIsts all directories within a list container
     /// Greedily list all blobs using the input params.
     ///</summary>
-    std::vector<std::pair<std::vector<list_hierarchical_item>, bool>> ListAllItemsHierarchical(const std::string& prefix,  const std::string& delimiter) override;
+    std::vector<std::pair<std::vector<list_hierarchical_item>, bool>> ListAllItemsHierarchical(const std::string& prefix, const std::string& delimiter) override;
     ///<summary>
     /// Updates the UNIX-style file mode on a path.
     ///</summary>
     int ChangeMode(const char* path, mode_t mode) override;
-
+protected:
+    ///<summary>
+    /// Blob Client to make blob storage calls
+    ///</summary>
+    std::shared_ptr<sync_blob_client> m_blob_client;
+    ///<summary>
+    /// Helper function - Authenticates with an account key
+    ///</summary>
+    std::shared_ptr<sync_blob_client> authenticate_blob_accountkey();
+    ///<summary>
+    /// Helper function - Authenticates with an account sas
+    ///</summary>
+    std::shared_ptr<sync_blob_client> authenticate_blob_sas();
+    ///<summary>
+    /// Helper function - Authenticates with msi
+    ///</summary>
+    std::shared_ptr<sync_blob_client> authenticate_blob_msi();
+    ///<summary>
+    /// Helper function - Authenticates with spn
+    ///</summary>
+    std::shared_ptr<sync_blob_client> authenticate_blob_spn();
 private:
     ///<summary>
     /// Helper function - Renames single file
@@ -107,28 +127,8 @@ private:
     ///</summary>
     int ensure_directory_path_exists_cache(const std::string & file_path);
     ///<summary>
-    /// Helper function - Authenticates with an account key
-    ///</summary>
-    std::shared_ptr<sync_blob_client> authenticate_accountkey();
-    ///<summary>
-    /// Helper function - Authenticates with an account sas
-    ///</summary>
-    std::shared_ptr<sync_blob_client> authenticate_sas();
-    ///<summary>
-    /// Helper function - Authenticates with msi
-    ///</summary>
-    std::shared_ptr<sync_blob_client> authenticate_msi();
-    ///<summary>
-    /// Helper function - Authenticates with spn
-    ///</summary>
-    std::shared_ptr<sync_blob_client> authenticate_spn();
-    ///<summary>
     /// Helper function - Checks metadata hdi_isfolder aka if the blob marker is a folder
     ///</summary>
     bool is_folder(const std::vector<std::pair<std::string,std::string>> & metadata);
-    ///<summary>
-    /// Blob Client to make blob storage calls
-    ///</summary>
-    std::shared_ptr<sync_blob_client> m_blob_client;
 };
 #endif //BLOCKBLOBBFSCLIENTBASE_H

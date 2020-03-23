@@ -85,6 +85,7 @@ set(AZURE_STORAGE_HEADER
   azure-storage-cpp-lite/adls/include/append_data_request.h
   azure-storage-cpp-lite/adls/include/flush_data_request.h
   azure-storage-cpp-lite/adls/include/rename_file_request.h
+  azure-storage-cpp-lite/adls/include/nlohmann_json_parser.h
 )
 
 set(AZURE_STORAGE_SOURCE
@@ -136,7 +137,8 @@ set(AZURE_STORAGE_SOURCE
   azure-storage-cpp-lite/adls/src/flush_data_request.cpp
   azure-storage-cpp-lite/adls/src/rename_file_request.cpp
   azure-storage-cpp-lite/adls/src/get_dfs_properties_request.cpp
-  azure-storage-cpp-lite/adls/include/get_dfs_properties_request.h
+  azure-storage-cpp-lite/adls/src/get_dfs_properties_request.cpp
+  azure-storage-cpp-lite/adls/src/nlohmann_json_parser.cpp
 )
 
 

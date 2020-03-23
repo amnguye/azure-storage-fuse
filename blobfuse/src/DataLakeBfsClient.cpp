@@ -13,13 +13,20 @@ bool DataLakeBfsClient::AuthenticateStorage()
     // Authenticate the storage account
     switch (configurations.authType) {
         case KEY_AUTH:
-            m_adls_client = authenticate_accountkey();
+            m_adls_client = authenticate_adls_accountkey();
+            m_blob_client = authenticate_blob_accountkey();
             break;
         case SAS_AUTH:
-            m_adls_client = authenticate_sas();
+            m_adls_client = authenticate_adls_sas();
+            m_blob_client = authenticate_blob_sas();
             break;
         case MSI_AUTH:
-            m_adls_client = authenticate_msi();
+            m_adls_client = authenticate_adls_msi();
+            m_blob_client = authenticate_blob_msi();
+            break;
+        case SPN_AUTH:
+            m_adls_client = authenticate_adls_spn();
+            m_blob_client = authenticate_blob_spn();
             break;
         default:
             return false;
@@ -45,7 +52,7 @@ bool DataLakeBfsClient::AuthenticateStorage()
     return false;
 }
 
-std::shared_ptr<microsoft_azure::storage::adls_client> DataLakeBfsClient::authenticate_accountkey()
+std::shared_ptr<adls_client> DataLakeBfsClient::authenticate_adls_accountkey()
 {
     try
     {
@@ -65,7 +72,7 @@ std::shared_ptr<microsoft_azure::storage::adls_client> DataLakeBfsClient::authen
                 cred,
                 configurations.useHttps,
                 configurations.blobEndpoint);
-        return std::make_shared<microsoft_azure::storage::adls_client>(
+        return std::make_shared<adls_client>(
                 account,
                 max_concurrency_blob_wrapper,
                 false); //If this applies to blobs in the future, we can use this as a feature to exit
@@ -78,7 +85,7 @@ std::shared_ptr<microsoft_azure::storage::adls_client> DataLakeBfsClient::authen
         return NULL;
     }
 }
-std::shared_ptr<microsoft_azure::storage::adls_client> DataLakeBfsClient::authenticate_sas()
+std::shared_ptr<adls_client> DataLakeBfsClient::authenticate_adls_sas()
 {
     try
     {
@@ -97,7 +104,7 @@ std::shared_ptr<microsoft_azure::storage::adls_client> DataLakeBfsClient::authen
                 configurations.accountName, cred,
                 configurations.useHttps,
                 configurations.blobEndpoint);
-        return std::make_shared<microsoft_azure::storage::adls_client>(
+        return std::make_shared<adls_client>(
                 account,
                 max_concurrency_blob_wrapper,
                 false); //If this applies to blobs in the future, we can use this as a feature to exit
@@ -110,7 +117,7 @@ std::shared_ptr<microsoft_azure::storage::adls_client> DataLakeBfsClient::authen
         return NULL;
     }
 }
-std::shared_ptr<microsoft_azure::storage::adls_client> DataLakeBfsClient::authenticate_msi() {
+std::shared_ptr<adls_client> DataLakeBfsClient::authenticate_adls_msi() {
     try {
         //1. get oauth token
         std::function<OAuthToken(std::shared_ptr<CurlEasyClient>)> MSICallback = SetUpMSICallback(
@@ -135,7 +142,7 @@ std::shared_ptr<microsoft_azure::storage::adls_client> DataLakeBfsClient::authen
                 cred,
                 true, //use_https must be true to use oauth
                 configurations.blobEndpoint);
-        return std::make_shared<microsoft_azure::storage::adls_client>(
+        return std::make_shared<adls_client>(
                 account,
                 max_concurrency_blob_wrapper,
                 false); //If this applies to blobs in the future, we can use this as a feature to exit
@@ -145,6 +152,48 @@ std::shared_ptr<microsoft_azure::storage::adls_client> DataLakeBfsClient::authen
     catch (const std::exception &ex) {
         syslog(LOG_ERR, "Failed to create blob client.  ex.what() = %s. Please check your account name and ",
                ex.what());
+        errno = unknown_error;
+        return NULL;
+    }
+}
+std::shared_ptr<adls_client> DataLakeBfsClient::authenticate_adls_spn()
+{
+    syslog(LOG_DEBUG, "Authenticating using MSI");
+    try
+    {
+        //1. get oauth token
+        std::function<OAuthToken(std::shared_ptr<CurlEasyClient>)> SPNCallback = SetUpSPNCallback(
+                configurations.spnTenantId,
+                configurations.spnClientId,
+                configurations.spnClientSecret,
+                configurations.aadEndpoint);
+
+        std::shared_ptr<OAuthTokenCredentialManager> tokenManager = GetTokenManagerInstance(SPNCallback);
+
+        if (!tokenManager->is_valid_connection()) {
+            // todo: isolate definitions of errno's for this function so we can output something meaningful.
+            errno = 1;
+            return NULL;
+        }
+
+        //2. try to make blob client wrapper using oauth token
+        std::shared_ptr<storage_credential> cred = std::make_shared<token_credential>();
+        std::shared_ptr<storage_account> account = std::make_shared<storage_account>(
+                configurations.accountName,
+                cred,
+                true, //use_https must be true to use oauth
+                configurations.blobEndpoint);
+        errno = 0;
+        return std::make_shared<adls_client>(
+                account,
+                max_concurrency_blob_wrapper,
+                false); //If this applies to blobs in the future, we can use this as a feature to exit
+        // blobfuse if we run into anything unexpected instead of logging errors
+
+    }
+    catch(const std::exception &ex)
+    {
+        syslog(LOG_ERR, "Failed to create blob client.  ex.what() = %s. Please check your account name and ", ex.what());
         errno = unknown_error;
         return NULL;
     }
@@ -250,9 +299,9 @@ std::vector<std::string> DataLakeBfsClient::Rename(std::string sourcePath, std::
 {
     m_adls_client->move_file(
             configurations.containerName,
-            sourcePath,
+            sourcePath.substr(1),
             configurations.containerName,
-            destinationPath);
+            destinationPath.substr(1));
 
     std::vector<std::string> file_paths_to_remove;
     std::string srcMntPathString = prepend_mnt_path_string(sourcePath);
@@ -306,7 +355,10 @@ BfsFileProperty DataLakeBfsClient::GetProperties(std::string pathName) {
             dfsprops.content_md5,
             dfsprops.content_type,
             dfsprops.etag,
-            "",
+            dfsprops.resource_type,
+            dfsprops.owner,
+            dfsprops.group,
+            dfsprops.permissions,
             dfsprops.metadata,
             dfsprops.last_modified,
             dfsprops.permissions,

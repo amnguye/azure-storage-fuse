@@ -77,7 +77,7 @@ int shared_lock_file(int flags, int fd);
 // Helper function to create all directories in the path if they don't already exist.
 int ensure_files_directory_exists_in_cache(const std::string& file_path);
 
-// Returns true if the input has zero length and the "hdi_isfolder=true" metadata.
+// Returns true if the input has zero length and the "hdi_isfolder=true" metadata or if the resource type = "directory"
 bool is_directory_blob(unsigned long long size, std::vector<std::pair<std::string, std::string>> metadata);
 
 // Sets up blobfuse to fuse operations

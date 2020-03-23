@@ -122,6 +122,11 @@ namespace microsoft_azure {
                             *outcome = storage_outcome<RESPONSE_TYPE>(error);
                             retry->add_result(code == CURLE_OK ? result: HTTP_CODE_SERVICE_UNAVAILABLE);
                         }
+                        else if (http->get_response_header(constants::header_content_type).find(constants::header_value_content_type_json) != std::string::npos)
+                        {
+                            *outcome = storage_outcome<RESPONSE_TYPE>(context->json_parser()->parse_response<RESPONSE_TYPE>(str));
+                            promise->set_value(*outcome);
+                        }
                         else
                         {
                             //if we are unable to parse or did not find the values we needed to parse the response

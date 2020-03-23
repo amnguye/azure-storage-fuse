@@ -10,16 +10,16 @@ bool BlockBlobBfsClient::AuthenticateStorage()
     // Authenticate the storage account
     switch (configurations.authType) {
         case KEY_AUTH:
-            m_blob_client = authenticate_accountkey();
+            m_blob_client = authenticate_blob_accountkey();
             break;
         case SAS_AUTH:
-            m_blob_client = authenticate_sas();
+            m_blob_client = authenticate_blob_sas();
             break;
         case MSI_AUTH:
-            m_blob_client = authenticate_msi();
+            m_blob_client = authenticate_blob_msi();
             break;
         case SPN_AUTH:
-            m_blob_client = authenticate_spn();
+            m_blob_client = authenticate_blob_spn();
             break;
         default:
             return false;
@@ -47,7 +47,7 @@ bool BlockBlobBfsClient::AuthenticateStorage()
     return false;
 }
 
-std::shared_ptr<sync_blob_client> BlockBlobBfsClient::authenticate_accountkey()
+std::shared_ptr<sync_blob_client> BlockBlobBfsClient::authenticate_blob_accountkey()
 {
     syslog(LOG_DEBUG, "Authenticating using account key");
     try
@@ -83,7 +83,7 @@ std::shared_ptr<sync_blob_client> BlockBlobBfsClient::authenticate_accountkey()
         return std::make_shared<blob_client_wrapper>(false);
     }
 }
-std::shared_ptr<sync_blob_client> BlockBlobBfsClient::authenticate_sas()
+std::shared_ptr<sync_blob_client> BlockBlobBfsClient::authenticate_blob_sas()
 {
     syslog(LOG_DEBUG, "Authenticating using SAS");
     try
@@ -118,7 +118,7 @@ std::shared_ptr<sync_blob_client> BlockBlobBfsClient::authenticate_sas()
         return std::make_shared<blob_client_wrapper>(false);
     }
 }
-std::shared_ptr<sync_blob_client> BlockBlobBfsClient::authenticate_msi()
+std::shared_ptr<sync_blob_client> BlockBlobBfsClient::authenticate_blob_msi()
 {
     syslog(LOG_DEBUG, "Authenticating using MSI");
     try
@@ -161,7 +161,7 @@ std::shared_ptr<sync_blob_client> BlockBlobBfsClient::authenticate_msi()
         return  std::make_shared<blob_client_wrapper>(false);
     }
 }
-std::shared_ptr<sync_blob_client> BlockBlobBfsClient::authenticate_spn()
+std::shared_ptr<sync_blob_client> BlockBlobBfsClient::authenticate_blob_spn()
 {
     syslog(LOG_DEBUG, "Authenticating using MSI");
     try
@@ -877,8 +877,8 @@ int BlockBlobBfsClient::ensure_directory_path_exists_cache(const std::string & f
 }
 
 std::vector<std::pair<std::vector<list_hierarchical_item>, bool>> BlockBlobBfsClient::ListAllItemsHierarchical(
-        const std::string& delimiter,
-        const std::string& prefix)
+        const std::string& prefix,
+        const std::string& delimiter)
 {
     static const int maxFailCount = 20;
     std::vector<std::pair<std::vector<list_hierarchical_item>, bool>>  results;

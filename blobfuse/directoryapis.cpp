@@ -143,7 +143,9 @@ int azs_readdir(const char *path, void *buf, fuse_fill_dir_t filler, off_t, stru
                 // TODO: order or hash the list to improve perf
                 if (std::find(local_list_results.begin(), local_list_results.end(), prev_token_str) == local_list_results.end())
                 {
-                    if (!listResults[result_lists_index].first[i].is_directory && !is_directory_blob(listResults[result_lists_index].first[i].content_length, listResults[result_lists_index].first[i].metadata))
+                    if (!listResults[result_lists_index].first[i].is_directory &&
+                    !is_directory_blob(listResults[result_lists_index].first[i].content_length,
+                            listResults[result_lists_index].first[i].metadata))
                     {
                         if ((prev_token_str.size() > 0) && (strcmp(prev_token_str.c_str(), former_directory_signifier.c_str()) != 0))
                         {

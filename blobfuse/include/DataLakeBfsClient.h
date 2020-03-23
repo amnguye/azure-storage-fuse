@@ -54,15 +54,19 @@ private:
     ///<summary>
     /// Helper function - Authenticates with an account key
     ///</summary>
-    std::shared_ptr<microsoft_azure::storage::adls_client> authenticate_accountkey();
+    std::shared_ptr<microsoft_azure::storage::adls_client> authenticate_adls_accountkey();
     ///<summary>
     /// Helper function - Authenticates with an account sas
     ///</summary>
-    std::shared_ptr<microsoft_azure::storage::adls_client> authenticate_sas();
+    std::shared_ptr<microsoft_azure::storage::adls_client> authenticate_adls_sas();
     ///<summary>
     /// Helper function - Authenticates with msi
     ///</summary>
-    std::shared_ptr<microsoft_azure::storage::adls_client> authenticate_msi();
+    std::shared_ptr<microsoft_azure::storage::adls_client> authenticate_adls_msi();
+    ///<summary>
+    /// Helper function - Authenticates with spn
+    ///</summary>
+    std::shared_ptr<adls_client> authenticate_adls_spn();
     ///<summary>
     /// ADLS Client to make dfs storage calls
     ///</summary>

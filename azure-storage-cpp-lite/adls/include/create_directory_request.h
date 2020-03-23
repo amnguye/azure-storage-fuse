@@ -2,7 +2,7 @@
 
 #include "adls_request_base.h"
 
-namespace microsoft_azure { namespace storage_adls {
+namespace microsoft_azure { namespace storage {
 
     class create_directory_request final : public adls_request_base
     {
@@ -15,4 +15,4 @@ namespace microsoft_azure { namespace storage_adls {
         std::string m_directory;
     };
 
-}}  // azure::storage_adls
+}}  // azure::storage

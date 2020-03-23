@@ -23,6 +23,7 @@ enum AUTH_TYPE {
     MSI_AUTH,
     SAS_AUTH,
     KEY_AUTH,
+    SPN_AUTH,
     INVALID_AUTH
 };
 const std::string former_directory_signifier = ".directory";
@@ -42,5 +43,9 @@ const int max_concurrency_oauth = 2;
 const int max_retry_oauth = 5;
 
 const int max_concurrency_blob_wrapper = 20;
+
+const std::string msi_request_uri = "http://169.254.169.254/metadata/identity/oauth2/token";
+const std::string oauth_request_uri = "https://login.microsoftonline.com";
+const std::string spn_request_path = "oauth2/v2.0/token";
 
 #endif //CONSTANT_h

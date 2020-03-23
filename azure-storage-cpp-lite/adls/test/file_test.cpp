@@ -6,7 +6,7 @@
 TEST_CASE("Create File", "[adls][file]")
 {
     {
-        azure::storage_adls::adls_client client = as_test::adls_base::test_adls_client(false);
+        azure::storage::adls_client client = as_test::adls_base::test_adls_client(false);
 
         std::string fs_name = as_test::adls_base::create_random_filesystem(client);
 
@@ -25,7 +25,7 @@ TEST_CASE("Create File", "[adls][file]")
         client.delete_filesystem(fs_name);
     }
     {
-        azure::storage_adls::adls_client client = as_test::adls_base::test_adls_client(true);
+        azure::storage::adls_client client = as_test::adls_base::test_adls_client(true);
         std::string fs_name = as_test::adls_base::create_random_filesystem(client);
 
         std::string file_name = as_test::get_random_string(10);
@@ -39,7 +39,7 @@ TEST_CASE("Create File", "[adls][file]")
 
 TEST_CASE("Append Data", "[adls][file]")
 {
-    azure::storage_adls::adls_client client = as_test::adls_base::test_adls_client(false);
+    azure::storage::adls_client client = as_test::adls_base::test_adls_client(false);
 
     std::string fs_name = as_test::adls_base::create_random_filesystem(client);
 
@@ -106,7 +106,7 @@ TEST_CASE("Append Data", "[adls][file]")
 
 TEST_CASE("Upload File", "[adls][file]")
 {
-    azure::storage_adls::adls_client client = as_test::adls_base::test_adls_client(false);
+    azure::storage::adls_client client = as_test::adls_base::test_adls_client(false);
 
     std::string fs_name = as_test::adls_base::create_random_filesystem(client);
 
@@ -138,13 +138,13 @@ TEST_CASE("Upload File", "[adls][file]")
 
 TEST_CASE("File Access Control", "[adls][file][acl]")
 {
-    azure::storage_adls::adls_client client = as_test::adls_base::test_adls_client(false);
+    azure::storage::adls_client client = as_test::adls_base::test_adls_client(false);
 
     std::string fs_name = as_test::adls_base::create_random_filesystem(client);
     std::string file_name = as_test::get_random_string(10);
     client.create_file(fs_name, file_name);
 
-    azure::storage_adls::access_control acl;
+    azure::storage::access_control acl;
     acl.acl = "user::rw-,group::rw-,other::r--";
 
     client.set_file_access_control(fs_name, file_name, acl);
@@ -165,7 +165,7 @@ TEST_CASE("File Access Control", "[adls][file][acl]")
 
 TEST_CASE("Move File", "[adls][file]")
 {
-    azure::storage_adls::adls_client client = as_test::adls_base::test_adls_client(false);
+    azure::storage::adls_client client = as_test::adls_base::test_adls_client(false);
 
     std::string fs1_name = as_test::adls_base::create_random_filesystem(client);
     std::string fs2_name = as_test::adls_base::create_random_filesystem(client);
@@ -209,7 +209,7 @@ TEST_CASE("Move File", "[adls][file]")
 
 TEST_CASE("File Properties", "[adls][file]")
 {
-    azure::storage_adls::adls_client client = as_test::adls_base::test_adls_client(false);
+    azure::storage::adls_client client = as_test::adls_base::test_adls_client(false);
 
     std::string fs_name = as_test::adls_base::create_random_filesystem(client);
     std::string file_name = as_test::get_random_string(10);

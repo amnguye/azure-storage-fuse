@@ -2,12 +2,12 @@
 #include "nlohmann_json_parser.h"
 #include "set_access_control_request.h"
 
-namespace microsoft_azure { namespace storage_adls {
+namespace microsoft_azure { namespace storage {
 
     std::vector<list_paths_item> nlohmann_json_parser::parse_list_paths_response(const std::string& response)
     {
         auto json_object = nlohmann::json::parse(response);
-        std::vector<microsoft_azure::storage_adls::list_paths_item> paths;
+        std::vector<microsoft_azure::storage::list_paths_item> paths;
 
         for (const auto& path_element : json_object["paths"])
         {
@@ -26,4 +26,4 @@ namespace microsoft_azure { namespace storage_adls {
         return paths;
     }
 
-}}  // azure::storage_adls
+}}  // azure::storage

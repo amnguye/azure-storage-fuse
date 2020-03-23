@@ -86,7 +86,7 @@ public:
     /// LIsts all directories within a list container
     /// Greedily list all blobs using the input params.
     ///</summary>
-    std::vector<std::pair<std::vector<list_hierarchical_item>, bool>> ListAllItemsHierarchical(const std::string& delimiter, const std::string& prefix) override;
+    std::vector<std::pair<std::vector<list_hierarchical_item>, bool>> ListAllItemsHierarchical(const std::string& prefix,  const std::string& delimiter) override;
     ///<summary>
     /// Updates the UNIX-style file mode on a path.
     ///</summary>
@@ -118,6 +118,10 @@ private:
     /// Helper function - Authenticates with msi
     ///</summary>
     std::shared_ptr<sync_blob_client> authenticate_msi();
+    ///<summary>
+    /// Helper function - Authenticates with spn
+    ///</summary>
+    std::shared_ptr<sync_blob_client> authenticate_spn();
     ///<summary>
     /// Helper function - Checks metadata hdi_isfolder aka if the blob marker is a folder
     ///</summary>

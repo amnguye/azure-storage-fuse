@@ -2,7 +2,7 @@
 
 #include "adls_request_base.h"
 
-namespace microsoft_azure { namespace storage_adls {
+namespace microsoft_azure { namespace storage {
 
     struct access_control
     {
@@ -24,4 +24,4 @@ namespace microsoft_azure { namespace storage_adls {
         access_control m_acl;
     };
 
-}}  // azure::storage_adls
+}}  // azure::storage

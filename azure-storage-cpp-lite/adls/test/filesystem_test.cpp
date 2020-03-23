@@ -6,7 +6,7 @@
 TEST_CASE("Create Filesystem", "[adls][filesystem]")
 {
     {
-        azure::storage_adls::adls_client client = as_test::adls_base::test_adls_client(false);
+        azure::storage::adls_client client = as_test::adls_base::test_adls_client(false);
         std::string fs_name = as_test::get_random_string(10);
 
         client.create_filesystem(fs_name);
@@ -21,7 +21,7 @@ TEST_CASE("Create Filesystem", "[adls][filesystem]")
         REQUIRE(errno != 0);
     }
     {
-        azure::storage_adls::adls_client client = as_test::adls_base::test_adls_client(true);
+        azure::storage::adls_client client = as_test::adls_base::test_adls_client(true);
         std::string fs_name = as_test::get_random_string(10);
 
         client.create_filesystem(fs_name);
@@ -35,7 +35,7 @@ TEST_CASE("Create Filesystem", "[adls][filesystem]")
 
 TEST_CASE("List Filesystem", "[adls][filesystem]")
 {
-    azure::storage_adls::adls_client client = as_test::adls_base::test_adls_client(false);
+    azure::storage::adls_client client = as_test::adls_base::test_adls_client(false);
 
     std::string prefix1 = as_test::get_random_string(5);
     std::string prefix2 = as_test::get_random_string(5);
@@ -82,7 +82,7 @@ TEST_CASE("List Filesystem", "[adls][filesystem]")
 
 TEST_CASE("Filesystem Properties", "[adls][filesystem]")
 {
-    azure::storage_adls::adls_client client = as_test::adls_base::test_adls_client(false);
+    azure::storage::adls_client client = as_test::adls_base::test_adls_client(false);
 
     std::string fs_name = as_test::adls_base::create_random_filesystem(client);
 

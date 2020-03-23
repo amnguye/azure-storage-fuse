@@ -3,7 +3,7 @@
 #include "adls_request_base.h"
 #include "set_access_control_request.h"
 
-namespace microsoft_azure { namespace storage_adls {
+namespace microsoft_azure { namespace storage {
 
     class get_access_control_request final : public adls_request_base
     {
@@ -16,4 +16,4 @@ namespace microsoft_azure { namespace storage_adls {
         std::string m_path;
     };
 
-}}  // azure::storage_adls
+}}  // azure::storage

@@ -3,7 +3,7 @@
 #include "adls_request_base.h"
 #include "set_access_control_request.h"
 
-namespace microsoft_azure { namespace storage_adls {
+namespace microsoft_azure { namespace storage {
 
     struct list_paths_item
     {
@@ -35,4 +35,4 @@ namespace microsoft_azure { namespace storage_adls {
         int m_max_results;
     };
 
-}}  // azure::storage_adls
+}}  // azure::storage

@@ -6,7 +6,7 @@
 #include "utility.h"
 
 namespace microsoft_azure {
-    namespace storage_adls {
+    namespace storage {
         void get_dfs_properties_request::build_request(const storage_account &account, http_base &http) const {
             http.set_method(http_base::http_method::head);
 

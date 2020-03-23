@@ -2,7 +2,7 @@
 
 #include "adls_request_base.h"
 
-namespace microsoft_azure { namespace storage_adls {
+namespace microsoft_azure { namespace storage {
 
     class rename_file_request final : public adls_request_base
     {
@@ -17,4 +17,4 @@ namespace microsoft_azure { namespace storage_adls {
         std::string m_destination_path;
     };
 
-}}  // azure::storage_adls
+}}  // azure::storage

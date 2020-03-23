@@ -10,9 +10,9 @@ namespace as_test {
 class adls_base : public base
 {
 public:
-    static azure::storage_adls::adls_client test_adls_client(bool exception_enabled)
+    static azure::storage::adls_client test_adls_client(bool exception_enabled)
     {
-        azure::storage_adls::adls_client client(init_account(standard_storage_connection_string()), 1, exception_enabled);
+        azure::storage::adls_client client(init_account(standard_storage_connection_string()), 1, exception_enabled);
         return client;
     }
 
@@ -22,7 +22,7 @@ public:
         return sscs;
     }
 
-    static std::string create_random_filesystem(azure::storage_adls::adls_client& client)
+    static std::string create_random_filesystem(azure::storage::adls_client& client)
     {
         std::string fs_name = as_test::get_random_string(10);
         client.create_filesystem(fs_name);

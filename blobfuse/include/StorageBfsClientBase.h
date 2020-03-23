@@ -21,10 +21,15 @@ struct str_options
     std::string blobEndpoint;
     std::string accountKey;
     std::string sasToken;
-    std::string clientId;
+    std::string identityClientId;
     std::string objectId;
     std::string resourceId;
     std::string msiEndpoint;
+    std::string msiSecret;
+    std::string spnClientId;
+    std::string spnTenantId;
+    std::string spnClientSecret;
+    std::string aadEndpoint;
     std::string containerName;
     std::string tmpPath;
     int fileCacheTimeoutInSeconds;
@@ -115,7 +120,7 @@ struct BfsFileProperty
 
 struct list_hierarchical_item {
     list_hierarchical_item(list_blobs_hierarchical_item);
-    list_hierarchical_item(microsoft_azure::storage_adls::list_paths_item item);
+    list_hierarchical_item(microsoft_azure::storage::list_paths_item item);
     std::string name;
     std::string snapshot;
     std::string last_modified;
@@ -128,14 +133,14 @@ struct list_hierarchical_item {
     std::string cache_control;
     std::string copy_status;
     std::vector<std::pair<std::string, std::string>> metadata;
-    microsoft_azure::storage_adls::access_control acl;
+    microsoft_azure::storage::access_control acl;
     bool is_directory;
 };
 
 struct list_hierarchical_response {
     list_hierarchical_response() : m_valid(false) {}
     list_hierarchical_response(list_blobs_hierarchical_response response);
-    list_hierarchical_response(microsoft_azure::storage_adls::list_paths_result response);
+    list_hierarchical_response(microsoft_azure::storage::list_paths_result response);
     std::string m_ms_request_id;
     std::vector<list_hierarchical_item> m_items;
     std::string m_next_marker;
@@ -222,7 +227,7 @@ public:
     /// LIsts all directories within a list container
     /// Greedily list all blobs using the input params.
     ///</summary>
-    virtual std::vector<std::pair<std::vector<list_hierarchical_item>, bool>> ListAllItemsHierarchical(const std::string& delimiter, const std::string& prefix) = 0;
+    virtual std::vector<std::pair<std::vector<list_hierarchical_item>, bool>> ListAllItemsHierarchical(const std::string& prefix, const std::string& delimiter) = 0;
     ///<summary>
     /// Updates the UNIX-style file mode on a path.
     ///</summary>

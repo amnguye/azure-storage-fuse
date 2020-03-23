@@ -39,7 +39,7 @@ list_hierarchical_item::list_hierarchical_item(list_blobs_hierarchical_item item
         metadata(std::move(item.metadata)),
         is_directory(item.is_directory) {}
 
-list_hierarchical_item::list_hierarchical_item(microsoft_azure::storage_adls::list_paths_item item) :
+list_hierarchical_item::list_hierarchical_item(microsoft_azure::storage::list_paths_item item) :
         name(item.name),
         last_modified(item.last_modified),
         etag(item.etag),
@@ -60,7 +60,7 @@ list_hierarchical_response::list_hierarchical_response(list_blobs_hierarchical_r
     }
 }
 
-list_hierarchical_response::list_hierarchical_response(microsoft_azure::storage_adls::list_paths_result response) :
+list_hierarchical_response::list_hierarchical_response(microsoft_azure::storage::list_paths_result response) :
     continuation_token(std::move(response.continuation_token)),
     m_valid(true)
 {

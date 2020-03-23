@@ -2,7 +2,7 @@
 
 #include "adls_request_base.h"
 
-namespace microsoft_azure { namespace storage_adls {
+namespace microsoft_azure { namespace storage {
 
     class flush_data_request final : public adls_request_base
     {
@@ -16,4 +16,4 @@ namespace microsoft_azure { namespace storage_adls {
         uint64_t m_offset;
     };
 
-}}  // azure::storage_adls
+}}  // azure::storage

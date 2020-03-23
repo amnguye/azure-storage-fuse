@@ -6,7 +6,7 @@
 TEST_CASE("Create Directory", "[adls][directory]")
 {
     {
-        azure::storage_adls::adls_client client = as_test::adls_base::test_adls_client(false);
+        azure::storage::adls_client client = as_test::adls_base::test_adls_client(false);
         std::string fs_name = as_test::adls_base::create_random_filesystem(client);
 
         std::string dir_name = as_test::get_random_string(10);
@@ -27,7 +27,7 @@ TEST_CASE("Create Directory", "[adls][directory]")
         client.delete_filesystem(fs_name);
     }
     {
-        azure::storage_adls::adls_client client = as_test::adls_base::test_adls_client(true);
+        azure::storage::adls_client client = as_test::adls_base::test_adls_client(true);
         std::string fs_name = as_test::adls_base::create_random_filesystem(client);
 
         std::string dir_name = as_test::get_random_string(10);
@@ -41,7 +41,7 @@ TEST_CASE("Create Directory", "[adls][directory]")
 
 TEST_CASE("Recursive Delete Directory", "[adls][directory]")
 {
-    azure::storage_adls::adls_client client = as_test::adls_base::test_adls_client(false);
+    azure::storage::adls_client client = as_test::adls_base::test_adls_client(false);
     std::string fs_name = as_test::adls_base::create_random_filesystem(client);
     std::string dir_name = as_test::get_random_string(10);
     client.create_directory(fs_name, dir_name);
@@ -54,7 +54,7 @@ TEST_CASE("Recursive Delete Directory", "[adls][directory]")
     {
         auto create_file_func = [fs_name, dir_name]()
         {
-            azure::storage_adls::adls_client client = as_test::adls_base::test_adls_client(false);
+            azure::storage::adls_client client = as_test::adls_base::test_adls_client(false);
             client.create_file(fs_name, dir_name + "/" + as_test::get_random_string(10));
             return errno == 0;
         };
@@ -73,13 +73,13 @@ TEST_CASE("Recursive Delete Directory", "[adls][directory]")
 
 TEST_CASE("Directory Access Control", "[adls][directory][acl]")
 {
-    azure::storage_adls::adls_client client = as_test::adls_base::test_adls_client(false);
+    azure::storage::adls_client client = as_test::adls_base::test_adls_client(false);
 
     std::string fs_name = as_test::adls_base::create_random_filesystem(client);
     std::string dir_name = as_test::get_random_string(10);
     client.create_directory(fs_name, dir_name);
 
-    azure::storage_adls::access_control acl;
+    azure::storage::access_control acl;
     acl.acl = "user::rw-,group::rw-,other::r--";
 
     client.set_directory_access_control(fs_name, dir_name, acl);
@@ -100,7 +100,7 @@ TEST_CASE("Directory Access Control", "[adls][directory][acl]")
 
 TEST_CASE("List Paths", "[adls][directory]")
 {
-    azure::storage_adls::adls_client client = as_test::adls_base::test_adls_client(false);
+    azure::storage::adls_client client = as_test::adls_base::test_adls_client(false);
     std::string fs_name = as_test::adls_base::create_random_filesystem(client);
     std::string dir_name = as_test::get_random_string(10);
     client.create_directory(fs_name, dir_name);
@@ -149,7 +149,7 @@ TEST_CASE("List Paths", "[adls][directory]")
 
 TEST_CASE("Move Directory", "[adls][directory]")
 {
-    azure::storage_adls::adls_client client = as_test::adls_base::test_adls_client(false);
+    azure::storage::adls_client client = as_test::adls_base::test_adls_client(false);
 
     std::string fs1_name = as_test::adls_base::create_random_filesystem(client);
     std::string fs2_name = as_test::adls_base::create_random_filesystem(client);
@@ -192,7 +192,7 @@ TEST_CASE("Move Directory", "[adls][directory]")
 
 TEST_CASE("Directory Properties", "[adls][directory]")
 {
-    azure::storage_adls::adls_client client = as_test::adls_base::test_adls_client(false);
+    azure::storage::adls_client client = as_test::adls_base::test_adls_client(false);
 
     std::string fs_name = as_test::adls_base::create_random_filesystem(client);
     std::string dir_name = as_test::get_random_string(10);
@@ -230,7 +230,7 @@ TEST_CASE("ADLS Token Authorization", "[adls][directory][token]")
 
     auto cred = std::make_shared<azure::storage_lite::token_credential>(oauth_token);
     auto account = std::make_shared<azure::storage_lite::storage_account>(account_name, cred);
-    auto client = std::make_shared<azure::storage_adls::adls_client>(account, 1);
+    auto client = std::make_shared<azure::storage::adls_client>(account, 1);
 
     std::string fs_name = as_test::adls_base::create_random_filesystem(*client);
     std::string dir_name = as_test::get_random_string(10);

@@ -18,6 +18,9 @@ bool BlockBlobBfsClient::AuthenticateStorage()
         case MSI_AUTH:
             m_blob_client = authenticate_msi();
             break;
+        case SPN_AUTH:
+            m_blob_client = authenticate_spn();
+            break;
         default:
             return false;
             break;
@@ -122,7 +125,7 @@ std::shared_ptr<sync_blob_client> BlockBlobBfsClient::authenticate_msi()
     {
         //1. get oauth token
         std::function<OAuthToken(std::shared_ptr<CurlEasyClient>)> MSICallback = SetUpMSICallback(
-                configurations.clientId,
+                configurations.identityClientId,
                 configurations.objectId,
                 configurations.resourceId,
                 configurations.msiEndpoint);
@@ -158,6 +161,50 @@ std::shared_ptr<sync_blob_client> BlockBlobBfsClient::authenticate_msi()
         return  std::make_shared<blob_client_wrapper>(false);
     }
 }
+std::shared_ptr<sync_blob_client> BlockBlobBfsClient::authenticate_spn()
+{
+    syslog(LOG_DEBUG, "Authenticating using MSI");
+    try
+    {
+        //1. get oauth token
+        std::function<OAuthToken(std::shared_ptr<CurlEasyClient>)> SPNCallback = SetUpSPNCallback(
+                configurations.spnTenantId,
+                configurations.spnClientId,
+                configurations.spnClientSecret,
+                configurations.aadEndpoint);
+
+        std::shared_ptr<OAuthTokenCredentialManager> tokenManager = GetTokenManagerInstance(SPNCallback);
+
+        if (!tokenManager->is_valid_connection()) {
+            // todo: isolate definitions of errno's for this function so we can output something meaningful.
+            errno = 1;
+            return std::make_shared<blob_client_wrapper>(false);
+        }
+
+        //2. try to make blob client wrapper using oauth token
+        std::shared_ptr<storage_credential> cred = std::make_shared<token_credential>();
+        std::shared_ptr<storage_account> account = std::make_shared<storage_account>(
+                configurations.accountName,
+                cred,
+                true, //use_https must be true to use oauth
+                configurations.blobEndpoint);
+        std::shared_ptr<blob_client> blobClient =
+                std::make_shared<microsoft_azure::storage::blob_client>(account, max_concurrency_oauth);
+        errno = 0;
+        if(configurations.useAttrCache){
+            return std::make_shared<blob_client_attr_cache_wrapper>(std::make_shared<blob_client_wrapper>(blobClient));
+        }
+        return std::make_shared<blob_client_wrapper>(blobClient);
+
+    }
+    catch(const std::exception &ex)
+    {
+        syslog(LOG_ERR, "Failed to create blob client.  ex.what() = %s. Please check your account name and ", ex.what());
+        errno = unknown_error;
+        return  std::make_shared<blob_client_wrapper>(false);
+    }
+}
+
 ///<summary>
 /// Uploads contents of a file to a block blob to the Storage service
 ///</summary>
@@ -850,7 +897,7 @@ std::vector<std::pair<std::vector<list_hierarchical_item>, bool>> BlockBlobBfsCl
                 prefix.c_str());
 
         errno = 0;
-        list_hierarchical_response response = List(delimiter, continuation, prefix);
+        list_hierarchical_response response = List(continuation, prefix, delimiter);
         if (errno == 0)
         {
             success = true;

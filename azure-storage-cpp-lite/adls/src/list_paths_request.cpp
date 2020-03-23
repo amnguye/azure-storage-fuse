@@ -3,7 +3,7 @@
 #include "storage_url.h"
 #include "utility.h"
 
-namespace microsoft_azure { namespace storage_adls {
+namespace microsoft_azure { namespace storage {
 
     void list_paths_request::build_request(const storage_account& account, http_base& http) const
     {
@@ -14,10 +14,14 @@ namespace microsoft_azure { namespace storage_adls {
         storage_url url = account.get_url(storage_account::service::adls);
         url.append_path(m_filesystem);
         url.add_query(constants::query_resource, constants::query_resource_filesystem);
-        url.add_query(constants::query_resource_directory, m_directory);
+        if(!m_directory.empty() && (m_directory != "/"))
+        {
+            url.add_query(constants::query_resource_directory, m_directory);
+        }
         url.add_query(constants::query_recursive, m_recursive ? "true" : "false");
+        url.add_query("upn", "false");
         add_optional_query(url, constants::query_continuation, m_continuation);
-        add_optional_query(url, constants::query_maxResults, m_max_results);
+        //add_optional_query(url, constants::query_maxResults, m_max_results);
 
         http.set_url(url.to_string());
 
@@ -29,4 +33,4 @@ namespace microsoft_azure { namespace storage_adls {
         account.credential()->sign_request(*this, http, url, headers);
     }
 
-}}  // azure::storage_adls
+}}  // azure::storage

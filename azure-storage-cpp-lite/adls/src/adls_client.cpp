@@ -15,10 +15,7 @@
 #include <syslog.h>
 #include <base64.h>
 
-namespace microsoft_azure { namespace storage_adls {
-
-    using microsoft_azure::storage::storage_outcome;
-    namespace constants = microsoft_azure::storage::constants;
+namespace microsoft_azure { namespace storage {
 
     adls_client::adls_client(std::shared_ptr<storage_account> account, int max_concurrency, bool exception_enabled) : m_account(account), m_blob_client(std::make_shared<microsoft_azure::storage::blob_client>(account, max_concurrency)), m_context(m_blob_client->context()), m_exception_enabled(exception_enabled)
     {
@@ -457,4 +454,4 @@ namespace microsoft_azure { namespace storage_adls {
 
         return props;
     }
-}}  // microsoft_azure::storage_adls
+}}  // microsoft_azure::storage

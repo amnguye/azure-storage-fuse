@@ -9,7 +9,7 @@
 #define BLOBFUSE_GET_DFS_PROPERTIES_REQUEST_H
 
 namespace microsoft_azure {
-    namespace storage_adls {
+    namespace storage {
         struct dfs_properties
         {
             std::string cache_control;

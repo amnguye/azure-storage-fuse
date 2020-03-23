@@ -1,13 +1,13 @@
 #pragma once
 
 #ifdef _WIN32
-#ifdef azure_storage_adls_EXPORTS
-#define AZURE_STORAGE_ADLS_API __declspec(dllexport)
+#ifdef azure_storage_EXPORTS
+#define AZURE_STORAGE_API __declspec(dllexport)
 #else
-#define AZURE_STORAGE_ADLS_API __declspec(dllimport)
+#define AZURE_STORAGE_API __declspec(dllimport)
 #endif
 #else /* ifdef _WIN32 */
-#define AZURE_STORAGE_ADLS_API
+#define AZURE_STORAGE_API
 #endif
 
 #include <stdexcept>
@@ -17,7 +17,7 @@
 #include "list_paths_request.h"
 #include "get_dfs_properties_request.h"
 
-namespace microsoft_azure { namespace storage_adls {
+namespace microsoft_azure { namespace storage {
     using storage_account = microsoft_azure::storage::storage_account;
     using executor_context = microsoft_azure::storage::executor_context;
 
@@ -49,23 +49,23 @@ namespace microsoft_azure { namespace storage_adls {
     {
     public:
         /// <summary>
-        /// Initializes a new instance of the <see cref="azure::storage_adls::adls_client" /> class.
+        /// Initializes a new instance of the <see cref="azure::storage::adls_client" /> class.
         /// <param name="account">An existing <see cref="azure::storage_alds::storage_account" /> object.</param>
         /// <param name="max_concurrency">An int value indicates the maximum concurrency expected during executing requests against the service.</param>
         /// <param name="exception_enabled">Whether to use exception or errno for error handling.</param>
-        AZURE_STORAGE_ADLS_API adls_client(std::shared_ptr<storage_account> account, int max_concurrency, bool exception_enabled = true);
+        AZURE_STORAGE_API adls_client(std::shared_ptr<storage_account> account, int max_concurrency, bool exception_enabled = true);
 
         /// <summary>
         /// Creates a filesystem. If the filesystem already exists, the operation fails.
         /// </summary>
         /// <param name="filesystem">The filesystem name.</param>
-        AZURE_STORAGE_ADLS_API void create_filesystem(const std::string& filesystem);
+        AZURE_STORAGE_API void create_filesystem(const std::string& filesystem);
 
         /// <summary>
         /// Marks the filesystem for deletion.
         /// </summary>
         /// <param name="filesystem">The filesystem name.</param>
-        AZURE_STORAGE_ADLS_API void delete_filesystem(const std::string& filesystem);
+        AZURE_STORAGE_API void delete_filesystem(const std::string& filesystem);
 
         /// <summary>
         /// Returns whether a filesystem already exists.
@@ -73,21 +73,21 @@ namespace microsoft_azure { namespace storage_adls {
         /// <param name="filesystem">The filesystem name.</param>
         /// <returns><c>true</c> if the filesystem exists, <c>false</c> otherwise.</returns>
         /// <remarks>Authentication failure may also lead this function to return false.</remarks>
-        AZURE_STORAGE_ADLS_API bool filesystem_exists(const std::string& filesystem);
+        AZURE_STORAGE_API bool filesystem_exists(const std::string& filesystem);
 
         /// <summary>
         /// Sets properties for the filesystem.
         /// </summary>
         /// <param name="filesystem">The filesystem name.</param>
         /// <param name="properties">Key-value pairs of properties</param>
-        AZURE_STORAGE_ADLS_API void set_filesystem_properties(const std::string& filesystem, const std::vector<std::pair<std::string, std::string>>& properties);
+        AZURE_STORAGE_API void set_filesystem_properties(const std::string& filesystem, const std::vector<std::pair<std::string, std::string>>& properties);
 
         /// <summary>
         /// Gets properties for the filesystem.
         /// </summary>
         /// <param name="filesystem">The filesystem name.</param>
         /// <returns>Key-value pairs of properties.</returns>
-        AZURE_STORAGE_ADLS_API std::vector<std::pair<std::string, std::string>> get_filesystem_properties(const std::string& filesystem);
+        AZURE_STORAGE_API std::vector<std::pair<std::string, std::string>> get_filesystem_properties(const std::string& filesystem);
 
         /// <summary>
         /// Lists filesystems.
@@ -100,22 +100,22 @@ namespace microsoft_azure { namespace storage_adls {
         /// list operation to continue listing the filesystems.
         /// </param>
         /// <param name="max_results">An optional value that specifies the maximum number of items to return.</param>
-        /// <returns>A <see cref="azure::storage_adls::list_filesystems_result"> object which contains filesystems list and continuation token.</returns>
-        AZURE_STORAGE_ADLS_API list_filesystems_result list_filesystems_segmented(const std::string& prefix, const std::string& continuation_token = std::string(), const int max_results = 0);
+        /// <returns>A <see cref="azure::storage::list_filesystems_result"> object which contains filesystems list and continuation token.</returns>
+        AZURE_STORAGE_API list_filesystems_result list_filesystems_segmented(const std::string& prefix, const std::string& continuation_token = std::string(), const int max_results = 0);
 
         /// <summary>
         /// Creates a directory in the filesystem. If the directory already exists, it's overwritten.
         /// </summary>
         /// <param name="filesystem">The filesystem name.</param>
         /// <param name="directory">The directory path.</param>
-        AZURE_STORAGE_ADLS_API void create_directory(const std::string& filesystem, const std::string& directory);
+        AZURE_STORAGE_API void create_directory(const std::string& filesystem, const std::string& directory);
 
         /// <summary>
         /// Deletes the directory.
         /// </summary>
         /// <param name="filesystem">The filesystem name.</param>
         /// <param name="directory">The directory path.</param>
-        AZURE_STORAGE_ADLS_API void delete_directory(const std::string& filesystem, const std::string& directory, bool recursive);
+        AZURE_STORAGE_API void delete_directory(const std::string& filesystem, const std::string& directory, bool recursive);
 
         /// <summary>
         /// Returns whether a directory already exists.
@@ -124,7 +124,7 @@ namespace microsoft_azure { namespace storage_adls {
         /// <param name="directory">The directory path.</param>
         /// <returns><c>true</c> if the directory exists, <c>false</c> otherwise.</returns>
         /// <remarks>Authentication failure may also lead this function to return false.</remarks>
-        AZURE_STORAGE_ADLS_API bool directory_exists(const std::string& filesystem, const std::string& directory);
+        AZURE_STORAGE_API bool directory_exists(const std::string& filesystem, const std::string& directory);
 
         /// <summary>
         /// Moves a directory into another directory inside the filesystem.
@@ -132,7 +132,7 @@ namespace microsoft_azure { namespace storage_adls {
         /// <param name="filesystem">The filesystem name.</param>
         /// <param name="source_path">The source directory path.</param>
         /// <param name="destination_path">The destination directory path.</param>
-        AZURE_STORAGE_ADLS_API void move_directory(const std::string& filesystem, const std::string& source_path, const std::string& destination_path);
+        AZURE_STORAGE_API void move_directory(const std::string& filesystem, const std::string& source_path, const std::string& destination_path);
 
         /// <summary>
         /// Moves a directory into another directory, the destination can be outside the source filesystem.
@@ -141,7 +141,7 @@ namespace microsoft_azure { namespace storage_adls {
         /// <param name="source_path">The source directory path.</param>
         /// <param name="destination_filesystem">The destination filesystem name.</param>
         /// <param name="destination_path">The destination directory.</param>
-        AZURE_STORAGE_ADLS_API void move_directory(const std::string& source_filesystem, const std::string& source_path, const std::string& destination_filesystem, const std::string& destination_path);
+        AZURE_STORAGE_API void move_directory(const std::string& source_filesystem, const std::string& source_path, const std::string& destination_filesystem, const std::string& destination_path);
 
         /// <summary>
         /// Sets properties for the directory.
@@ -149,7 +149,7 @@ namespace microsoft_azure { namespace storage_adls {
         /// <param name="filesystem">The filesystem name.</param>
         /// <param name="directory">The directory path.</param>
         /// <param name="properties">Key-value pairs of properties</param>
-        AZURE_STORAGE_ADLS_API void set_directory_properties(const std::string& filesystem, const std::string& directory, const std::vector<std::pair<std::string, std::string>>& properties);
+        AZURE_STORAGE_API void set_directory_properties(const std::string& filesystem, const std::string& directory, const std::vector<std::pair<std::string, std::string>>& properties);
 
         /// <summary>
         /// Gets properties for the directory.
@@ -157,7 +157,7 @@ namespace microsoft_azure { namespace storage_adls {
         /// <param name="filesystem">The filesystem name.</param>
         /// <param name="directory">The directory path.</param>
         /// <returns>Key-value pairs of properties.</returns>
-        AZURE_STORAGE_ADLS_API std::vector<std::pair<std::string, std::string>> get_directory_properties(const std::string& filesystem, const std::string& directory);
+        AZURE_STORAGE_API std::vector<std::pair<std::string, std::string>> get_directory_properties(const std::string& filesystem, const std::string& directory);
 
         /// <summary>
         /// Sets access control for a directory.
@@ -165,7 +165,7 @@ namespace microsoft_azure { namespace storage_adls {
         /// <param name="filesystem">The filesystem name.</param>
         /// <param name="directory">The directory path.</param>
         /// <param name="acl">A <see cref="azure::azure_adls::access_control" /> object that represents POSIX access control.</param>
-        AZURE_STORAGE_ADLS_API void set_directory_access_control(const std::string& filesystem, const std::string& directory, const access_control& acl);
+        AZURE_STORAGE_API void set_directory_access_control(const std::string& filesystem, const std::string& directory, const access_control& acl);
 
         /// <summary>
         /// Gets access control for a directory.
@@ -173,7 +173,7 @@ namespace microsoft_azure { namespace storage_adls {
         /// <param name="filesystem">The filesystem name.</param>
         /// <param name="directory">The directory path.</param>
         /// <returns>A <see cref="azure::azure_adls::access_control" /> object that represents POSIX access control.</returns>
-        AZURE_STORAGE_ADLS_API access_control get_directory_access_control(const std::string& filesystem, const std::string& directory);
+        AZURE_STORAGE_API access_control get_directory_access_control(const std::string& filesystem, const std::string& directory);
 
         /// <summary>
         /// Lists filesystem paths and their properties.
@@ -188,15 +188,15 @@ namespace microsoft_azure { namespace storage_adls {
         /// list operation to continue listing the directory.
         /// </param>
         /// <param name="max_results">An optional value that specifies the maximum number of items to return.</param>
-        /// <returns>A <see cref="azure::storage_adls::list_paths_result" /> object which contains paths list and continuation token.</returns>
-        AZURE_STORAGE_ADLS_API list_paths_result list_paths_segmented(const std::string& filesystem, const std::string& directory, bool recursive = false, const std::string& continuation_token = std::string(), const int max_results = 0);
+        /// <returns>A <see cref="azure::storage::list_paths_result" /> object which contains paths list and continuation token.</returns>
+        AZURE_STORAGE_API list_paths_result list_paths_segmented(const std::string& filesystem, const std::string& directory, bool recursive = false, const std::string& continuation_token = std::string(), const int max_results = 0);
 
         /// <summary>
         /// Creates an empty file in the filesystem. If the file already exists, it'll be overwritten.
         /// </summary>
         /// <param name="filesystem">The filesystem name.</param>
         /// <param name="file">The file path.</param>
-        AZURE_STORAGE_ADLS_API void create_file(const std::string& filename, const std::string& file);
+        AZURE_STORAGE_API void create_file(const std::string& filename, const std::string& file);
 
         /// <summary>
         /// Uploads data to be appended to a file.
@@ -206,7 +206,7 @@ namespace microsoft_azure { namespace storage_adls {
         /// <param name="offset">The position where the data is to be appended.</param>
         /// <param name="in_stream">The source stream.</param>
         /// <param name="stream_len">Length of the stream.</param>
-        AZURE_STORAGE_ADLS_API void append_data_from_stream(const std::string& filesystem, const std::string& file, uint64_t offset, std::istream& in_stream, uint64_t stream_len = 0);
+        AZURE_STORAGE_API void append_data_from_stream(const std::string& filesystem, const std::string& file, uint64_t offset, std::istream& in_stream, uint64_t stream_len = 0);
 
         /// <summary>
         /// Flushes previously uploaded data to a file. To flush, the previously uploaded data must be contiguous.
@@ -214,7 +214,7 @@ namespace microsoft_azure { namespace storage_adls {
         /// <param name="filesystem">The filesystem name.</param>
         /// <param name="file">The file path.</param>
         /// <param name="offset">The position must be equal to the length of the file after all data has been written. </param>
-        AZURE_STORAGE_ADLS_API void flush_data(const std::string& filesystem, const std::string& file, uint64_t offset);
+        AZURE_STORAGE_API void flush_data(const std::string& filesystem, const std::string& file, uint64_t offset);
 
         /// <summary>
         /// Uploads the contents of a stream to a file.
@@ -223,7 +223,7 @@ namespace microsoft_azure { namespace storage_adls {
         /// <param name="file">The file path.</param>
         /// <param name="in_stream">The source stream.</param>
         /// <param name="properties">Key-value pairs of properties.</param>
-        AZURE_STORAGE_ADLS_API void upload_file_from_stream(const std::string& filesystem, const std::string& file, std::istream& in_stream, const std::vector<std::pair<std::string, std::string>>& properties = std::vector<std::pair<std::string, std::string>>());
+        AZURE_STORAGE_API void upload_file_from_stream(const std::string& filesystem, const std::string& file, std::istream& in_stream, const std::vector<std::pair<std::string, std::string>>& properties = std::vector<std::pair<std::string, std::string>>());
 
         /// <summary>
         /// Downloads the contents of a file to a stream.
@@ -231,7 +231,7 @@ namespace microsoft_azure { namespace storage_adls {
         /// <param name="filesystem">The filesystem name.</param>
         /// <param name="file">The file path.</param>
         /// <param name="out_stream">The target stream.</param>
-        AZURE_STORAGE_ADLS_API void download_file_to_stream(const std::string& filesystem, const std::string& file, std::ostream& out_stream);
+        AZURE_STORAGE_API void download_file_to_stream(const std::string& filesystem, const std::string& file, std::ostream& out_stream);
 
         /// <summary>
         /// Downloads the contents of a file to a stream.
@@ -241,14 +241,14 @@ namespace microsoft_azure { namespace storage_adls {
         /// <param name="offset">The offset where to begin downloading the file, in bytes.</param>
         /// <param name="size">The size of data to download, in bytes. Specify 0 if you want to download till end.</param>
         /// <param name="out_stream">The target stream.</param>
-        AZURE_STORAGE_ADLS_API void download_file_to_stream(const std::string& filesystem, const std::string& file, uint64_t offset, uint64_t size, std::ostream& out_stream);
+        AZURE_STORAGE_API void download_file_to_stream(const std::string& filesystem, const std::string& file, uint64_t offset, uint64_t size, std::ostream& out_stream);
 
         /// <summary>
         /// Deletes the file.
         /// </summary>
         /// <param name="filesystem">The filesystem name.</param>
         /// <param name="file">The file path.</param>
-        AZURE_STORAGE_ADLS_API void delete_file(const std::string& filesystem, const std::string& file);
+        AZURE_STORAGE_API void delete_file(const std::string& filesystem, const std::string& file);
 
         /// <summary>
         /// Returns whether a file already exists.
@@ -257,7 +257,7 @@ namespace microsoft_azure { namespace storage_adls {
         /// <param name="file">The file path.</param>
         /// <returns><c>true</c> if the file exists, <c>false</c> otherwise.</returns>
         /// <remarks>Authentication failure may also lead this function to return false.</remarks>
-        AZURE_STORAGE_ADLS_API bool file_exists(const std::string& filesystem, const std::string& file);
+        AZURE_STORAGE_API bool file_exists(const std::string& filesystem, const std::string& file);
 
         /// <summary>
         /// Moves a file into another place within the filesystem.
@@ -267,7 +267,7 @@ namespace microsoft_azure { namespace storage_adls {
         /// <param name="filesystem">The filesystem name.</param>
         /// <param name="source_path">The source file path.</param>
         /// <param name="destination_path">The destination file or directory path.</param>
-        AZURE_STORAGE_ADLS_API void move_file(const std::string& filesystem, const std::string& source_path, const std::string& destination_path);
+        AZURE_STORAGE_API void move_file(const std::string& filesystem, const std::string& source_path, const std::string& destination_path);
 
         /// <summary>
         /// Moves a file into another place, the destination can be outside the source filesystem.
@@ -278,7 +278,7 @@ namespace microsoft_azure { namespace storage_adls {
         /// <param name="source_path">The source file path.</param>
         /// <param name="destination_filesystem">The destination filesystem.</param>
         /// <param name="destination_path">The destination file or directory path.</param>
-        AZURE_STORAGE_ADLS_API void move_file(const std::string& source_filesystem, const std::string& source_path, const std::string& destination_filesystem, const std::string& destination_path);
+        AZURE_STORAGE_API void move_file(const std::string& source_filesystem, const std::string& source_path, const std::string& destination_filesystem, const std::string& destination_path);
 
         /// <summary>
         /// Sets properties for the file.
@@ -286,7 +286,7 @@ namespace microsoft_azure { namespace storage_adls {
         /// <param name="filesystem">The filesystem name.</param>
         /// <param name="file">The file path.</param>
         /// <param name="properties">Key-value pairs of properties</param>
-        AZURE_STORAGE_ADLS_API void set_file_properties(const std::string& filesystem, const std::string& file, const std::vector<std::pair<std::string, std::string>>& properties);
+        AZURE_STORAGE_API void set_file_properties(const std::string& filesystem, const std::string& file, const std::vector<std::pair<std::string, std::string>>& properties);
 
         /// <summary>
         /// Gets properties for the file.
@@ -294,7 +294,7 @@ namespace microsoft_azure { namespace storage_adls {
         /// <param name="filesystem">The filesystem name.</param>
         /// <param name="file">The file path.</param>
         /// <returns>Key-value pairs of properties.</returns>
-        AZURE_STORAGE_ADLS_API std::vector<std::pair<std::string, std::string>> get_file_properties(const std::string& filesystem, const std::string& file);
+        AZURE_STORAGE_API std::vector<std::pair<std::string, std::string>> get_file_properties(const std::string& filesystem, const std::string& file);
 
         /// <summary>
         /// Sets access control for a file.
@@ -302,7 +302,7 @@ namespace microsoft_azure { namespace storage_adls {
         /// <param name="filesystem">The filesystem name.</param>
         /// <param name="file">The file path.</param>
         /// <param name="acl">A <see cref="azure::azure_adls::access_control" /> object that represents POSIX access control.</param>
-        AZURE_STORAGE_ADLS_API void set_file_access_control(const std::string& filesystem, const std::string& file, const access_control& acl);
+        AZURE_STORAGE_API void set_file_access_control(const std::string& filesystem, const std::string& file, const access_control& acl);
 
         /// <summary>
         /// Gets access control for a file.
@@ -310,17 +310,17 @@ namespace microsoft_azure { namespace storage_adls {
         /// <param name="filesystem">The filesystem name.</param>
         /// <param name="file">The file path.</param>
         /// <returns>A <see cref="azure::azure_adls::access_control" /> object that represents POSIX access control.</returns>
-        AZURE_STORAGE_ADLS_API access_control get_file_access_control(const std::string& filesystem, const std::string& file);
+        AZURE_STORAGE_API access_control get_file_access_control(const std::string& filesystem, const std::string& file);
 
         /// <summary>
         /// Gets the full properties for a path.
         /// </summary>
         /// <param name="filesystem">The filesystem name.</param>
         /// <param name="path">The path.</param>
-        AZURE_STORAGE_ADLS_API dfs_properties get_dfs_path_properties(const std::string& filesystem, const std::string& path);
+        AZURE_STORAGE_API dfs_properties get_dfs_path_properties(const std::string& filesystem, const std::string& path);
 
         /// <summary>
-        /// Returns whether exception is enabled for this <see cref="azure::storage_adls::adls_client" />.
+        /// Returns whether exception is enabled for this <see cref="azure::storage::adls_client" />.
         /// </summary>
         /// <returns><c>true</c> if exception is enabled, <c>false</c> otherwise.</returns>
         bool exception_enabled() const
@@ -344,4 +344,4 @@ namespace microsoft_azure { namespace storage_adls {
         const bool m_exception_enabled;
     };
 
-}}  // azure::storage_adls
+}}  // azure::storage

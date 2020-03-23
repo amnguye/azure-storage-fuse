@@ -45,7 +45,7 @@ bool DataLakeBfsClient::AuthenticateStorage()
     return false;
 }
 
-std::shared_ptr<microsoft_azure::storage_adls::adls_client> DataLakeBfsClient::authenticate_accountkey()
+std::shared_ptr<microsoft_azure::storage::adls_client> DataLakeBfsClient::authenticate_accountkey()
 {
     try
     {
@@ -65,7 +65,7 @@ std::shared_ptr<microsoft_azure::storage_adls::adls_client> DataLakeBfsClient::a
                 cred,
                 configurations.useHttps,
                 configurations.blobEndpoint);
-        return std::make_shared<microsoft_azure::storage_adls::adls_client>(
+        return std::make_shared<microsoft_azure::storage::adls_client>(
                 account,
                 max_concurrency_blob_wrapper,
                 false); //If this applies to blobs in the future, we can use this as a feature to exit
@@ -78,7 +78,7 @@ std::shared_ptr<microsoft_azure::storage_adls::adls_client> DataLakeBfsClient::a
         return NULL;
     }
 }
-std::shared_ptr<microsoft_azure::storage_adls::adls_client> DataLakeBfsClient::authenticate_sas()
+std::shared_ptr<microsoft_azure::storage::adls_client> DataLakeBfsClient::authenticate_sas()
 {
     try
     {
@@ -97,7 +97,7 @@ std::shared_ptr<microsoft_azure::storage_adls::adls_client> DataLakeBfsClient::a
                 configurations.accountName, cred,
                 configurations.useHttps,
                 configurations.blobEndpoint);
-        return std::make_shared<microsoft_azure::storage_adls::adls_client>(
+        return std::make_shared<microsoft_azure::storage::adls_client>(
                 account,
                 max_concurrency_blob_wrapper,
                 false); //If this applies to blobs in the future, we can use this as a feature to exit
@@ -110,11 +110,11 @@ std::shared_ptr<microsoft_azure::storage_adls::adls_client> DataLakeBfsClient::a
         return NULL;
     }
 }
-std::shared_ptr<microsoft_azure::storage_adls::adls_client> DataLakeBfsClient::authenticate_msi() {
+std::shared_ptr<microsoft_azure::storage::adls_client> DataLakeBfsClient::authenticate_msi() {
     try {
         //1. get oauth token
         std::function<OAuthToken(std::shared_ptr<CurlEasyClient>)> MSICallback = SetUpMSICallback(
-                configurations.clientId,
+                configurations.identityClientId,
                 configurations.objectId,
                 configurations.resourceId,
                 configurations.msiEndpoint);
@@ -135,7 +135,7 @@ std::shared_ptr<microsoft_azure::storage_adls::adls_client> DataLakeBfsClient::a
                 cred,
                 true, //use_https must be true to use oauth
                 configurations.blobEndpoint);
-        return std::make_shared<microsoft_azure::storage_adls::adls_client>(
+        return std::make_shared<microsoft_azure::storage::adls_client>(
                 account,
                 max_concurrency_blob_wrapper,
                 false); //If this applies to blobs in the future, we can use this as a feature to exit
@@ -191,7 +191,7 @@ D_RETURN_CODE DataLakeBfsClient::IsDirectoryEmpty(std::string path)
     std::string continuation = "";
     do{
         errno = 0;
-        microsoft_azure::storage_adls::list_paths_result pathsResult = m_adls_client->list_paths_segmented(
+        microsoft_azure::storage::list_paths_result pathsResult = m_adls_client->list_paths_segmented(
                 configurations.containerName,
                 path,
                 false,
@@ -273,7 +273,7 @@ list_hierarchical_response DataLakeBfsClient::List(std::string continuation, std
             continuation.c_str(),
             prefix.c_str(),
             delimiter.c_str());
-    microsoft_azure::storage_adls::list_paths_result listed_adls_response = m_adls_client->list_paths_segmented(
+    microsoft_azure::storage::list_paths_result listed_adls_response = m_adls_client->list_paths_segmented(
             configurations.containerName,
             prefix,
             false,
@@ -285,7 +285,7 @@ list_hierarchical_response DataLakeBfsClient::List(std::string continuation, std
 
 int DataLakeBfsClient::ChangeMode(const char *path, mode_t mode) {
     // TODO: Once ADLS works in blobfuse, verify that we don't need to get the access
-    microsoft_azure::storage_adls::access_control accessControl;
+    microsoft_azure::storage::access_control accessControl;
     accessControl.acl = modeToString(mode);
 
     errno = 0;
@@ -295,7 +295,7 @@ int DataLakeBfsClient::ChangeMode(const char *path, mode_t mode) {
 }
 
 BfsFileProperty DataLakeBfsClient::GetProperties(std::string pathName) {
-    microsoft_azure::storage_adls::dfs_properties dfsprops =
+    microsoft_azure::storage::dfs_properties dfsprops =
             m_adls_client->get_dfs_path_properties(configurations.containerName, pathName);
 
     return BfsFileProperty(

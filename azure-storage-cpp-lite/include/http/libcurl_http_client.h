@@ -14,6 +14,8 @@
 #include <vector>
 
 #include <curl/curl.h>
+#include <syslog.h>
+#include <utility.h>
 
 #include "storage_EXPORTS.h"
 
@@ -23,6 +25,8 @@
 #undef min
 namespace microsoft_azure {
     namespace storage {
+
+        std::string to_lower(std::string original);
 
         class CurlEasyClient;
 
@@ -53,7 +57,6 @@ namespace microsoft_azure {
                 }
 
                 void add_header(const std::string &name, const std::string &value) override {
-            m_request_headers.emplace(name, value);
                     std::string header(name);
                     header.append(": ").append(value);
                     m_slist = curl_slist_append(m_slist, header.data());
@@ -93,6 +96,9 @@ namespace microsoft_azure {
         {
             std::this_thread::sleep_for(interval);
             const auto curlCode = perform();
+
+                    syslog(curlCode != CURLE_OK || unsuccessful(m_code) ? LOG_ERR : LOG_DEBUG, "%s", format_request_response().c_str());
+
             cb(m_code, m_error_stream, curlCode);
         }
 
@@ -142,6 +148,7 @@ namespace microsoft_azure {
             m_input_stream = s;
             check_code(curl_easy_setopt(m_curl, CURLOPT_READFUNCTION, read));
             check_code(curl_easy_setopt(m_curl, CURLOPT_READDATA, this));
+                    check_code(curl_easy_setopt(m_curl, CURLOPT_POSTFIELDS, nullptr)); // CURL won't actually read data on POSTs unless this is explicitly set.
         }
 
                 void set_input_buffer(char* buff) override
@@ -149,6 +156,7 @@ namespace microsoft_azure {
                     m_input_buffer = buff;
                     check_code(curl_easy_setopt(m_curl, CURLOPT_READFUNCTION, read));
                     check_code(curl_easy_setopt(m_curl, CURLOPT_READDATA, this));
+                    check_code(curl_easy_setopt(m_curl, CURLOPT_POSTFIELDS, nullptr)); // CURL won't actually read data on POSTs unless this is explicitly set.
                 }
 
                 void set_input_content_length(size_t content_length)
@@ -232,6 +240,66 @@ namespace microsoft_azure {
                 http_code m_code;
         std::map<std::string, std::string, case_insensitive_compare> m_response_headers;
 
+                std::string format_request_response()
+                {
+                    std::string out;
+                    auto currentTime = std::time(nullptr);
+                    auto timestamp = std::asctime(std::localtime(&currentTime));
+
+                    auto sigLoc = m_url.find("sig=");
+                    auto tmpURL = m_url;
+
+                    if (sigLoc != std::string::npos) {
+                        // Find the string and replace the segment
+                        for(auto i = sigLoc; i < tmpURL.length(); i++) {
+                            if(tmpURL[i] == '&' || i == tmpURL.length()-1) {
+                                auto count =
+                                        (i - sigLoc) + // The real count, if we landed on &
+                                        (i == tmpURL.length() - 1 ? 1 : 0); // If we're at the end, trim to the end.
+                                tmpURL.replace(sigLoc, count, "sig=REDACTED");
+                                break;
+                            }
+                        }
+                    }
+
+                    out += timestamp;
+                    out.erase(out.end()-1);
+                    out += " ==> REQUEST/RESPONSE\n";
+                    out += "\t" + http_method_label[m_method] + " " + tmpURL + "\n";
+
+                    // our headers
+                    for(auto x = m_slist; x->next != nullptr; x = x->next) {
+                        std::string header = std::string(x->data);
+                        auto splitAt = header.find(':');
+
+                        if (splitAt != header.length() - 1) {
+                            std::string name = header.substr(0, splitAt);
+                            std::string value = header.substr(splitAt + 2);
+
+                            if(to_lower(name) == "authorization" || to_lower(name) == "secret") {
+                                value = "REDACTED";
+                            }
+
+                            out = out.append("\t").append(name).append(": [").append(value).append("]\n");
+                        } else {
+                            out = out.append("\t").append(header.substr(0, splitAt)).append(": []").append("\n");
+                        }
+                    }
+
+                    out += "\t--------------------------------------------------------------------------------\n";
+                    out += "\tRESPONSE Status: " + std::to_string(m_code) + "\n";
+
+                    // their headers
+                    for(const auto& pair : m_response_headers) {
+                        auto lineReturn = pair.second.find('\n');
+                        // ternary statement also trims the carriage return character, which accidentally clears lines.
+                        auto trimmed_str = pair.second.substr(0, pair.second[lineReturn - 1] == '\r' ? lineReturn - 1 : lineReturn );
+                        out = out.append("\t").append(pair.first).append(": [").append(trimmed_str).append("]\n");
+                    }
+
+                    return out;
+                }
+
                 AZURE_STORAGE_API static size_t header_callback(char *buffer, size_t size, size_t nitems, void *userdata);
 
                 static size_t write(char *buffer, size_t size, size_t nitems, void *userdata)
@@ -250,41 +318,39 @@ namespace microsoft_azure {
 
                 static size_t read(char *buffer, size_t size, size_t nitems, void *userdata)
                 {
-            REQUEST_TYPE *p = static_cast<REQUEST_TYPE *>(userdata);
+                    REQUEST_TYPE *p = static_cast<REQUEST_TYPE *>(userdata);
+                    auto &s = p->m_input_stream.istream();
+                    size_t contentlen = p->get_input_content_length();
+                    size_t actual_size = 0 ;
+                    if( ! p->get_is_input_length_known() ) {
+                        auto cur = s.tellg();
+                        s.seekg(0, std::ios_base::end);
+                        auto end = s.tellg();
+                        s.seekg(cur);
+                        actual_size = std::min(static_cast<size_t>(end-cur), size * nitems);
+                    }
+                    else
+                    {
+                        actual_size = std::min(contentlen, size * nitems);
+                    }
 
-            size_t actual_size = 0;
-            if (p->m_input_stream.valid())
-            {
-                auto &s = p->m_input_stream.istream();
-                if (p->get_is_input_length_known())
-                {
-                    actual_size = std::min(size * nitems, p->m_input_content_length - p->m_input_read_pos);
-                }
-                else
-                {
-                    std::streampos cur_pos = s.tellg();
-                    s.seekg(0, std::ios_base::end);
-                    std::streampos end_pos = s.tellg();
-                    s.seekg(cur_pos, std::ios_base::beg);
-                    actual_size = std::min(size * nitems, static_cast<size_t>(end_pos - cur_pos));
-                }
-                s.read(buffer, actual_size);
-                if (s.fail())
-                {
-                    return CURL_READFUNC_ABORT;
-                }
-                actual_size = static_cast<size_t>(s.gcount());
-                p->m_input_read_pos += actual_size;
-            }
-            else if (p->m_input_buffer != nullptr)
-            {
-                actual_size = std::min(size * nitems, p->m_input_content_length - p->m_input_read_pos);
-                memcpy(buffer, p->m_input_buffer + p->m_input_read_pos, actual_size);
-                p->m_input_read_pos += actual_size;
-            }
+                    if (p->m_input_buffer != NULL)
+                    {
+                        memcpy(buffer, p->m_input_buffer + p->m_input_buffer_pos, actual_size);
+                        p->m_input_buffer_pos += actual_size;
+                    }
+                    else
+                    {
+                        s.read(buffer, actual_size);
+                    }
 
-            return actual_size;
-        }
+                    if(p->get_is_input_length_known()) {
+                        contentlen -= actual_size;
+                        p->set_input_content_length(contentlen);
+                    }
+
+                    return actual_size;
+                }
 
                 static void check_code(CURLcode code, std::string = std::string())
                 {

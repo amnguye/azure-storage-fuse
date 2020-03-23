@@ -7,14 +7,14 @@ TEST_CASE("Client General", "[adls][client]")
 {
     for (bool exception_enabled : {true, false})
     {
-        azure::storage_adls::adls_client client = as_test::adls_base::test_adls_client(exception_enabled);
+        azure::storage::adls_client client = as_test::adls_base::test_adls_client(exception_enabled);
         REQUIRE(client.exception_enabled() == exception_enabled);
     }
 }
 
 TEST_CASE("Client Throw Exception", "[adls][client]")
 {
-    azure::storage_adls::adls_client client = as_test::adls_base::test_adls_client(true);
+    azure::storage::adls_client client = as_test::adls_base::test_adls_client(true);
 
     bool exception_caught = false;
     try
@@ -30,7 +30,7 @@ TEST_CASE("Client Throw Exception", "[adls][client]")
 
 TEST_CASE("Client Errno", "[adls][client]")
 {
-    azure::storage_adls::adls_client client = as_test::adls_base::test_adls_client(false);
+    azure::storage::adls_client client = as_test::adls_base::test_adls_client(false);
 
     bool exception_caught = false;
     int error_code = 0;

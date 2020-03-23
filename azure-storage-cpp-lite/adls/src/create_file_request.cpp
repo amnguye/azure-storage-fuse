@@ -3,7 +3,7 @@
 #include "storage_url.h"
 #include "utility.h"
 
-namespace microsoft_azure { namespace storage_adls {
+namespace microsoft_azure { namespace storage {
 
     void create_file_request::build_request(const storage_account& account, http_base& http) const
     {
@@ -26,4 +26,4 @@ namespace microsoft_azure { namespace storage_adls {
         account.credential()->sign_request(*this, http, url, headers);
     }
 
-}}  // azure::storage_adls
+}}  // azure::storage

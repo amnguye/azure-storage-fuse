@@ -54,19 +54,19 @@ private:
     ///<summary>
     /// Helper function - Authenticates with an account key
     ///</summary>
-    std::shared_ptr<microsoft_azure::storage_adls::adls_client> authenticate_accountkey();
+    std::shared_ptr<microsoft_azure::storage::adls_client> authenticate_accountkey();
     ///<summary>
     /// Helper function - Authenticates with an account sas
     ///</summary>
-    std::shared_ptr<microsoft_azure::storage_adls::adls_client> authenticate_sas();
+    std::shared_ptr<microsoft_azure::storage::adls_client> authenticate_sas();
     ///<summary>
     /// Helper function - Authenticates with msi
     ///</summary>
-    std::shared_ptr<microsoft_azure::storage_adls::adls_client> authenticate_msi();
+    std::shared_ptr<microsoft_azure::storage::adls_client> authenticate_msi();
     ///<summary>
     /// ADLS Client to make dfs storage calls
     ///</summary>
-    std::shared_ptr<microsoft_azure::storage_adls::adls_client> m_adls_client;
+    std::shared_ptr<microsoft_azure::storage::adls_client> m_adls_client;
 };
 
 #endif //DATALAKEBFSCLIENT_H

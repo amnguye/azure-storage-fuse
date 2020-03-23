@@ -4,7 +4,7 @@
 #include "storage_account.h"
 #include "constants.h"
 
-namespace microsoft_azure { namespace storage_adls {
+namespace microsoft_azure { namespace storage {
 
     using storage_account = microsoft_azure::storage::storage_account;
     using http_base = microsoft_azure::storage::http_base;
@@ -13,4 +13,4 @@ namespace microsoft_azure { namespace storage_adls {
     {
     };
 
-}}  // azure::storage_adls
+}}  // azure::storage

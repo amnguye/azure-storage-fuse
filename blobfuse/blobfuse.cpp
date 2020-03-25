@@ -182,9 +182,9 @@ int read_config_env()
     }
     else
     {
-        syslog(LOG_CRIT, "Unable to start blobfuse.  No config file was specified and the AZURE_STORAGE_ACCCOUNT"
+        syslog(LOG_CRIT, "Unable to start blobfuse.  No config file was specified and the AZURE_STORAGE_ACCOUNT"
                          "environment variable was empty");
-        fprintf(stderr, "Unable to start blobfuse.  No config file was specified and the AZURE_STORAGE_ACCCOUNT"
+        fprintf(stderr, "Unable to start blobfuse.  No config file was specified and the AZURE_STORAGE_ACCOUNT"
                         "environment variable was empty\n");
         return -1;
     }

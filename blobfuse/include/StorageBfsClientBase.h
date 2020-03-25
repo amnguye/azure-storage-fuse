@@ -326,6 +326,11 @@ protected:
     /// Helper function - To append root foolder to ache to cache folder
     ///</summary>
     std::string prepend_mnt_path_string(const std::string& path);
+    ///<summary>
+    /// Helper function - Ensures directory path exists in the cache
+    /// TODO: refactoring, rename variables and add comments to make sense to parsing
+    ///</summary>
+    int ensure_directory_path_exists_cache(const std::string & file_path);
 };
 
 #endif

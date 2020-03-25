@@ -839,42 +839,6 @@ int BlockBlobBfsClient::rename_directory(std::string src, std::string dst, std::
     return 0;
 }
 
-int BlockBlobBfsClient::ensure_directory_path_exists_cache(const std::string & file_path)
-{
-    char *pp;
-    char *slash;
-    int status;
-    char *copypath = strdup(file_path.c_str());
-
-    status = 0;
-    errno = 0;
-    pp = copypath;
-    while (status == 0 && (slash = strchr(pp, '/')) != 0)
-    {
-        if (slash != pp)
-        {
-            *slash = '\0';
-            AZS_DEBUGLOGV("Making cache directory %s.\n", copypath);
-            struct stat st;
-            if (stat(copypath, &st) != 0)
-            {
-                status = mkdir(copypath, configurations.defaultPermission);
-            }
-
-            // Ignore if some other thread was successful creating the path
-            if(errno == EEXIST)
-            {
-                status = 0;
-                errno = 0;
-            }
-
-            *slash = '/';
-        }
-        pp = slash + 1;
-    }
-    free(copypath);
-    return status;
-}
 
 std::vector<std::pair<std::vector<list_hierarchical_item>, bool>> BlockBlobBfsClient::ListAllItemsHierarchical(
         const std::string& prefix,

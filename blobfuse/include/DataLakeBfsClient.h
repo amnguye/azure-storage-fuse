@@ -68,6 +68,11 @@ private:
     ///</summary>
     std::shared_ptr<adls_client> authenticate_adls_spn();
     ///<summary>
+    /// Helper function - Renames cached files
+    ///</summary>
+    ///<returns>Error value</return>
+    int rename_cached_file(std::string src, std::string dest);
+    ///<summary>
     /// ADLS Client to make dfs storage calls
     ///</summary>
     std::shared_ptr<microsoft_azure::storage::adls_client> m_adls_client;

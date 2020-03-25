@@ -122,11 +122,6 @@ private:
     ///</summary>
     int rename_directory(std::string src, std::string dst, std::vector<std::string> & files_to_remove_cache);
     ///<summary>
-    /// Helper function - Ensures directory path exists in the cache
-    /// TODO: refactoring, rename variables and add comments to make sense to parsing
-    ///</summary>
-    int ensure_directory_path_exists_cache(const std::string & file_path);
-    ///<summary>
     /// Helper function - Checks metadata hdi_isfolder aka if the blob marker is a folder
     ///</summary>
     bool is_folder(const std::vector<std::pair<std::string,std::string>> & metadata);

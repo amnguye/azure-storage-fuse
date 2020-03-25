@@ -1,5 +1,6 @@
 #include "include/StorageBfsClientBase.h"
 #include <vector>
+#include <sys/stat.h>
 //
 // Created by amanda on 1/17/20.
 //
@@ -23,6 +24,43 @@ std::string StorageBfsClientBase::prepend_mnt_path_string(const std::string& pat
     std::string result;
     result.reserve(configurations.tmpPath.length() + 5 + path.length());
     return result.append(configurations.tmpPath).append("/root").append(path);
+}
+
+int StorageBfsClientBase::ensure_directory_path_exists_cache(const std::string & file_path)
+{
+    char *pp;
+    char *slash;
+    int status;
+    char *copypath = strdup(file_path.c_str());
+
+    status = 0;
+    errno = 0;
+    pp = copypath;
+    while (status == 0 && (slash = strchr(pp, '/')) != 0)
+    {
+        if (slash != pp)
+        {
+            *slash = '\0';
+            AZS_DEBUGLOGV("Making cache directory %s.\n", copypath);
+            struct stat st;
+            if (stat(copypath, &st) != 0)
+            {
+                status = mkdir(copypath, configurations.defaultPermission);
+            }
+
+            // Ignore if some other thread was successful creating the path
+            if(errno == EEXIST)
+            {
+                status = 0;
+                errno = 0;
+            }
+
+            *slash = '/';
+        }
+        pp = slash + 1;
+    }
+    free(copypath);
+    return status;
 }
 
 list_hierarchical_item::list_hierarchical_item(list_blobs_hierarchical_item item) :

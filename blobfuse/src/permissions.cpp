@@ -5,17 +5,22 @@
 #include <permissions.h>
 
 std::string modeToString(mode_t mode) {
-    std::string result;
+    std::string result = "user::"; // = "user::rwx,group::r--,mask::rwx,other::---";
 
-    for (int i = 0; i < 3; i++)
-    {
-        // Push back the string with each of the mode segments
-        result += mode & 01 ? 'x' : '-';
-        result += mode & 02 ? 'w' : '-';
-        result += mode & 04 ? 'r' : '-';
-        // Push mode forward 3
-        mode = mode >> 3;
-    }
+    result.push_back(mode & (1 << 8) ? 'r': '-');
+    result.push_back(mode & (1 << 7) ? 'w' : '-');
+    result.push_back(mode & (1 << 6) ? 'x' : '-');
+
+    result += ",group::";
+    result.push_back(mode & (1 << 5) ? 'r' : '-');
+    result.push_back(mode & (1 << 4) ? 'w' : '-');
+    result.push_back(mode & (1 << 3) ? 'x' : '-');
+
+    // Push back the string with each of the mode segments
+    result += ",other::";
+    result.push_back(mode & (1 << 2) ? 'r' : '-');
+    result.push_back(mode & (1 << 1) ? 'w' : '-');
+    result.push_back(mode & 01 ? 'w' : '-');
 
     return result;
 }

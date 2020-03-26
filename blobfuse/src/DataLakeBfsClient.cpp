@@ -336,11 +336,12 @@ list_hierarchical_response DataLakeBfsClient::List(std::string continuation, std
 
 int DataLakeBfsClient::ChangeMode(const char *path, mode_t mode) {
     // TODO: Once ADLS works in blobfuse, verify that we don't need to get the access
+    std::string pathStr(path);
     microsoft_azure::storage::access_control accessControl;
     accessControl.acl = modeToString(mode);
 
     errno = 0;
-    m_adls_client->set_file_access_control(configurations.containerName, path, accessControl);
+    m_adls_client->set_file_access_control(configurations.containerName, pathStr.substr(1), accessControl);
 
     return errno;
 }

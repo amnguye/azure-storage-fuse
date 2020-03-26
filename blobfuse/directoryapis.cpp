@@ -204,6 +204,10 @@ int azs_rmdir(const char *path)
 
     if(!storage_client->DeleteDirectory(pathString.substr(1)))
     {
+        if(errno == HTTP_REQUEST_CONFLICT)
+        {
+            return -ENOTEMPTY;
+        }
         return -errno;
     }
     return 0;

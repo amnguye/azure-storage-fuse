@@ -41,11 +41,13 @@ const int LOW_THRESHOLD_VALUE = 80;
 /* Defines values for concurrency for making blob wrappers */
 const int max_concurrency_oauth = 2;
 const int max_retry_oauth = 5;
-
 const int max_concurrency_blob_wrapper = 20;
 
 const std::string msi_request_uri = "http://169.254.169.254/metadata/identity/oauth2/token";
 const std::string oauth_request_uri = "https://login.microsoftonline.com";
 const std::string spn_request_path = "oauth2/v2.0/token";
+
+/*HTTP Error values */
+const int HTTP_REQUEST_CONFLICT = 409;
 
 #endif //CONSTANT_h

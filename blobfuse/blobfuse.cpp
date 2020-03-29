@@ -60,6 +60,7 @@ inline bool is_lowercase_string(const std::string &s)
 
 AUTH_TYPE get_auth_type(std::string authStr = "") {
 
+
     if(!authStr.empty()) {
         std::string lcAuthType = to_lower(authStr);
         if (lcAuthType == "msi") {
@@ -98,7 +99,7 @@ AUTH_TYPE get_auth_type(std::string authStr = "") {
 
 // Read Storage connection information from the environment variables
 int read_config_env()
-{
+{ 
     char* env_account = getenv("AZURE_STORAGE_ACCOUNT");
     char* env_account_key = getenv("AZURE_STORAGE_ACCESS_KEY");
     char* env_sas_token = getenv("AZURE_STORAGE_SAS_TOKEN");
@@ -115,9 +116,9 @@ int read_config_env()
     char* env_aad_endpoint = getenv("AZURE_STORAGE_AAD_ENDPOINT");
 
     if(env_account)
-    {
+    {   
         str_options.accountName = env_account;
-
+        
         if(env_account_key)
         {
             str_options.accountKey = env_account_key;
@@ -168,11 +169,19 @@ int read_config_env()
             str_options.msiSecret = env_managed_identity_secret;
         }
 
-        str_options.authType = get_auth_type(env_auth_type);
+        if(env_auth_type)
+        {
+             str_options.authType = get_auth_type(env_auth_type);
+        }
+        else
+        {
+            str_options.authType = get_auth_type();
+        }
+        
 
         if(env_aad_endpoint)
         {
-            str_options.aadEndpoint = env_auth_type;
+            str_options.aadEndpoint = env_aad_endpoint;
         }
 
         if(env_blob_endpoint) {
@@ -182,13 +191,13 @@ int read_config_env()
     }
     else
     {
-        syslog(LOG_CRIT, "Unable to start blobfuse.  No config file was specified and the AZURE_STORAGE_ACCOUNT"
+        syslog(LOG_CRIT, "Unable to start blobfuse.  No config file was specified and the AZURE_STORAGE_ACCCOUNT"
                          "environment variable was empty");
-        fprintf(stderr, "Unable to start blobfuse.  No config file was specified and the AZURE_STORAGE_ACCOUNT"
+        fprintf(stderr, "Unable to start blobfuse.  No config file was specified and the AZURE_STORAGE_ACCCOUNT"
                         "environment variable was empty\n");
         return -1;
     }
-
+    
     return 0;
 }
 
@@ -347,7 +356,7 @@ void *azs_init(struct fuse_conn_info * conn)
 void print_usage()
 {
     fprintf(stdout, "Usage: blobfuse <mount-folder> --tmp-path=</path/to/fusecache> [--config-file=</path/to/config.cfg> | --container-name=<containername>]");
-    fprintf(stdout, "    [--use-https=true] [--file-cache-timeout-in-seconds=120] [--log-level=LOG_OFF|LOG_CRIT|LOG_ERR|LOG_WARNING|LOG_INFO|LOG_DEBUG] [--use-attr-cache=true]\n\n");
+    fprintf(stdout, "    [--use-https=true] [--file-cache-timeout-in-seconds=120] [--log-level=LOG_OFF|LOG_CRIT|LOG_ERR|LOG_WARNING|LOG_INFO|LOG_DEBUG] [--use-attr-cache=true] [--use-adls=true]\n\n");
     fprintf(stdout, "In addition to setting --tmp-path parameter, you must also do one of the following:\n");
     fprintf(stdout, "1. Specify a config file (using --config-file]=) with account name (accountName), container name (containerName), and\n");
     fprintf(stdout,  "\ta. account key (accountKey),\n");
@@ -480,6 +489,7 @@ int read_and_set_arguments(int argc, char *argv[], struct fuse_args *args)
 
         if(file_options.help)
         {
+            fprintf(stderr, "Log level not set");
             print_usage();
             exit(0);
         }
@@ -508,15 +518,18 @@ int read_and_set_arguments(int argc, char *argv[], struct fuse_args *args)
             return ret;
         }
     }
-    catch(std::exception &)
+    catch(const std::exception & ex )
     {
         print_usage();
+        fprintf(stderr, "Exception thrown in read_and_set_arguments, Exception:");
+        fprintf(stderr, "%s\n", ex.what());
         return 1;
     }
 
     int res = set_log_mask(file_options.log_level);
     if (res != 0)
     {
+        fprintf(stderr, "Log Level not set");
         print_usage();
         return 1;
     }

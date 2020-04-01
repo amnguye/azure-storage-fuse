@@ -343,6 +343,26 @@ int DataLakeBfsClient::ChangeMode(const char *path, mode_t mode) {
     errno = 0;
     m_adls_client->set_file_access_control(configurations.containerName, pathStr.substr(1), accessControl);
 
+    std::string mntPathString = prepend_mnt_path_string(pathStr);
+    int acc = access(mntPathString.c_str(), F_OK);
+    if (acc != -1)
+    {
+        // if path exists in local cache, then update permissions, if not no need to update it
+        AZS_DEBUGLOGV("Accessing mntPath = %s for chmod succeeded; object is in the local cache.\n", mntPathString.c_str());
+
+        int res = chmod(mntPathString.c_str(), mode);
+        if (res == -1)
+        {
+            int lstaterrno = errno;
+            syslog(LOG_ERR, "chmod on file %s in local cache during getattr failed with errno = %d.\n", mntPathString.c_str(), lstaterrno);
+            return -lstaterrno;
+        }
+        else
+        {
+            AZS_DEBUGLOGV("chmod on file %s in local cache succeeded.\n", mntPathString.c_str());
+        }
+    }
+
     return errno;
 }
 

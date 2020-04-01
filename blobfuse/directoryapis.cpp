@@ -126,31 +126,33 @@ int azs_readdir(const char *path, void *buf, fuse_fill_dir_t filler, off_t, stru
         {
             int fillerResult;
             // We need to parse out just the trailing part of the path name.
+            list_hierarchical_item current_result = listResults[result_lists_index].first[i];
             int len = listResults[result_lists_index].first[i].name.size();
             if (len > 0)
             {
                 std::string prev_token_str;
-                if (listResults[result_lists_index].first[i].name.back() == '/')
+                if (current_result.name.back() == '/')
                 {
-                    prev_token_str = listResults[result_lists_index].first[i].name.substr(pathStr.size() - 1, listResults[result_lists_index].first[i].name.size() - pathStr.size());
+                    prev_token_str = current_result.name.substr(pathStr.size() - 1, current_result.name.size() - pathStr.size());
                 }
                 else
                 {
-                    prev_token_str = listResults[result_lists_index].first[i].name.substr(pathStr.size() - 1);
+                    prev_token_str = current_result.name.substr(pathStr.size() - 1);
                 }
 
                 // Any files that exist both on the service and in the local cache will be in both lists, we need to de-dup them.
                 // TODO: order or hash the list to improve perf
                 if (std::find(local_list_results.begin(), local_list_results.end(), prev_token_str) == local_list_results.end())
                 {
-                    if (!listResults[result_lists_index].first[i].is_directory &&
-                    !is_directory_blob(listResults[result_lists_index].first[i].content_length,
+                    if (!current_result.is_directory &&
+                    !is_directory_blob(current_result.content_length,
                             listResults[result_lists_index].first[i].metadata))
                     {
                         if ((prev_token_str.size() > 0) && (strcmp(prev_token_str.c_str(), former_directory_signifier.c_str()) != 0))
                         {
                             struct stat stbuf;
-                            stbuf.st_mode = S_IFREG | str_options.defaultPermission; // Regular file (not a directory)
+                            mode_t perms = current_result.mode == 0 ? str_options.defaultPermission : listResults[result_lists_index].first[i].mode;
+                            stbuf.st_mode = S_IFREG | perms; // Regular file (not a directory)
                             stbuf.st_uid = fuse_get_context()->uid;
                             stbuf.st_gid = fuse_get_context()->gid;
                             stbuf.st_nlink = 1;

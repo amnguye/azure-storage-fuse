@@ -47,6 +47,9 @@ const std::string msi_request_uri = "http://169.254.169.254/metadata/identity/oa
 const std::string oauth_request_uri = "https://login.microsoftonline.com";
 const std::string spn_request_path = "oauth2/v2.0/token";
 
+/* Size of acls*/
+const int acl_size = 9;
+
 /*HTTP Error values */
 const int HTTP_REQUEST_CONFLICT = 409;
 

@@ -217,6 +217,7 @@ struct list_hierarchical_item {
     std::string copy_status;
     std::vector<std::pair<std::string, std::string>> metadata;
     microsoft_azure::storage::access_control acl;
+    mode_t mode;
     bool is_directory;
 };
 

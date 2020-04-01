@@ -23,7 +23,50 @@ std::string modeToString(mode_t mode) {
     result += ",other::";
     result.push_back(mode & (1 << 2) ? 'r' : '-');
     result.push_back(mode & (1 << 1) ? 'w' : '-');
-    result.push_back(mode & 01 ? 'w' : '-');
+    result.push_back(mode & 01 ? 'x' : '-');
 
     return result;
+}
+
+mode_t aclToMode(access_control acl)
+{
+    mode_t mode = 0;
+
+    std::string permissions = acl.permissions;
+    if(permissions.empty())
+    {
+        syslog(LOG_ERR, "Failure to convert permissions, empty permissions from service");
+        return mode;
+    }
+    else if(permissions.size() != acl_size)
+    {
+        syslog(LOG_ERR, "Failure: Unexpected amount of permissions from service");
+        return mode;
+    }
+    try {
+        if (permissions[0] == 'r')
+            mode |= 0400;
+        if (permissions[1] == 'w')
+            mode |= 0200;
+        if (permissions[2] == 'x')
+            mode |= 0100;
+        if (permissions[3] == 'r')
+            mode |= 0040;
+        if (permissions[4] == 'w')
+            mode |= 0020;
+        if (permissions[5] == 'x')
+            mode |= 0010;
+        if (permissions[6] == 'r')
+            mode |= 0004;
+        if (permissions[7] == 'w')
+            mode |= 0002;
+        if (permissions[8] == 'x')
+            mode |= 0001;
+    }
+    catch(std::exception err)
+    {
+        syslog(LOG_ERR, "Failure parsing permissions from service");
+        return 0;
+    }
+    return mode;
 }

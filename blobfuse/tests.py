@@ -1666,5 +1666,86 @@ class CacheTests(BlobfuseTest):
         if os.path.exists(testDirPath):
             shutil.rmtree(testDirPath)
 
+
+#These tests are specifically for ADLS/DataLake, enable the "--use-adls" flag to "true"
+#(e.g. "--use-adls=true"). If run without this flag or set to false, these tests might fail
+# because for blobs we cannot set the change mode through the blob api
+class ChangeModeTests(BlobfuseTest):
+    def test_chmod(self):
+        testFileName = "TestFile"
+        testFilePath = os.path.join(self.blobstage, testFileName)
+
+        # make file
+        fd = os.open(testFilePath, os.O_CREAT | os.O_WRONLY | os.O_TRUNC)
+        os.close(fd)
+
+        #act
+        os.chmod(testFilePath, 0440)
+
+        #assert
+        self.assertTrue((os.stat(testFilePath).st_mode & 0o777) == 0440)
+
+        #cleanup
+        os.remove(testFilePath)
+
+    def test_chmod_twice(self):
+        testFileName = "TestFile"
+        testFilePath = os.path.join(self.blobstage, testFileName)
+
+        # make file
+        fd = os.open(testFilePath, os.O_CREAT | os.O_WRONLY | os.O_TRUNC)
+        os.close(fd)
+
+        #act
+        os.chmod(testFilePath, 0440)
+
+        #assert
+        self.assertTrue((os.stat(testFilePath).st_mode & 0o777) == 0440)
+
+        #cleanup
+        os.remove(testFilePath)
+
+    def test_chmod_directory(self):
+        testDirName = "testDir"
+        testDirPath = os.path.join(self.blobstage, testDirName)
+
+        os.mkdir(testDirPath)
+
+        self.validate_dir_creation(testDirPath, testDirName, self.blobstage)
+
+        testFileName = "TestFile"
+        testFilePath = os.path.join(testDirPath, testFileName)
+
+        fd = os.open(testFilePath, os.O_CREAT | os.O_WRONLY | os.O_TRUNC)
+        os.close(fd)
+        os.chmod(testFilePath, 0660)
+
+        os.chmod(testDirPath, 0440)
+
+        self.assertTrue((os.stat(testFilePath).st_mode & 0o777) == 0440)
+        self.assertTrue((os.stat(testDirPath).st_mode & 0o777) == 0440)
+
+        os.remove(testFilePath)
+        os.rmdir(testDirPath)
+
+    def test_chmod_empty_directory(self):
+        testDirName = "testDir"
+        testDirPath = os.path.join(self.blobstage, testDirName)
+
+        os.mkdir(testDirPath)
+
+        self.validate_dir_creation(testDirPath, testDirName, self.blobstage)
+
+        os.chmod(testDirPath, 0444)
+
+        self.assertTrue((os.stat(testDirPath).st_mode & 0o777) == 0444)
+
+        os.rmdir(os.path.join(self.blobstage, testDirName))
+
+    def test_chmod_error(self):
+        testFileName = "TestFile"
+        testFilePath = os.path.join(self.blobstage, testFileName)
+
+
 if __name__ == '__main__':
     unittest.main()

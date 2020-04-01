@@ -1,6 +1,7 @@
 #include "include/StorageBfsClientBase.h"
 #include <vector>
 #include <sys/stat.h>
+#include <permissions.h>
 //
 // Created by amanda on 1/17/20.
 //
@@ -83,6 +84,7 @@ list_hierarchical_item::list_hierarchical_item(microsoft_azure::storage::list_pa
         etag(item.etag),
         content_length(item.content_length),
         acl(item.acl),
+        mode(aclToMode(item.acl)),
         is_directory(item.is_directory) {}
 
 list_hierarchical_response::list_hierarchical_response(list_blobs_hierarchical_response response) :

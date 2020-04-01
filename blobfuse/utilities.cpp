@@ -287,6 +287,7 @@ int azs_chown(const char * /*path*/, uid_t /*uid*/, gid_t /*gid*/)
 
 int azs_chmod(const char * path, mode_t mode)
 {
+    //This is only functional when --use-adls is enabled as a mount flag
     AZS_DEBUGLOGV("azs_chmod called with path = %s, mode = %o.\n", path, mode);
 
     errno = 0;
